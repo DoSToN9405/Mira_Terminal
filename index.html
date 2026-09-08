@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>⛏️ MIRA TERMINAL v7.0</title>
+  <title>⛏️ MIRA TERMINAL v7.1</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -32,7 +32,7 @@
 <body>
 <div id="terminal">
   <div style="display:flex;justify-content:space-between;border-bottom:1px solid #00ff8833;padding-bottom:6px;margin-bottom:6px;flex-wrap:wrap;">
-    <span>⛏️ MIRA TERMINAL v7.0 — <span id="status-indicator" class="status-led led-red"></span><span id="status-text">OFFLINE</span></span>
+    <span>⛏️ MIRA TERMINAL v7.1 — <span id="status-indicator" class="status-led led-red"></span><span id="status-text">OFFLINE</span></span>
     <span class="muted">pid: <span id="pid">7312</span> | uptime: <span id="uptime">0s</span></span>
   </div>
   <div id="output"></div>
@@ -45,9 +45,6 @@
   const TG = window.Telegram.WebApp;
   TG.expand();
 
-  // ============================================================
-  //  КОНФИГУРАЦИЯ
-  // ============================================================
   const API_BASE = 'https://mira.networkk.workers.dev';
   const CONFIG = {
     masterAddress: 'EQCRF0wncfdqLCo97O2P1M7IYixTrh3fGVTscsERyj0gmegA',
@@ -75,6 +72,7 @@
 
   let miningInterval = null;
   let lastTickTime = 0;
+  let miningActive = false;
   const output = document.getElementById('output');
   const input = document.getElementById('input');
 
@@ -82,7 +80,7 @@
     const div = document.createElement('div');
     div.className = 'log-entry';
     const time = new Date().toLocaleTimeString();
-    const cls = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'highlight' ? 'highlight' : 'info';
+    const cls = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'highlight' ? 'highlight' : type === 'muted' ? 'muted' : 'info';
     div.innerHTML = `<span class="time">[${time}]</span><span class="${cls}">${msg}</span>`;
     output.appendChild(div);
     output.scrollTop = output.scrollHeight;
@@ -90,7 +88,18 @@
   }
 
   // ============================================================
-  //  API
+  //  SHA-256 (синхронизирован с сервером)
+  // ============================================================
+  async function sha256(msg) {
+    const data = new TextEncoder().encode(msg);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hash))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  // ============================================================
+  //  API — БЕЗ isTest
   // ============================================================
   async function apiCall(endpoint, data = {}) {
     try {
@@ -100,16 +109,14 @@
         body: JSON.stringify({
           ...data,
           userId: TG.initDataUnsafe?.user?.id || 'anon',
-          initData: TG.initData || '',
-          nonce: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36),
-          isTest: true
+          initData: TG.initData || ''
         })
       });
       const result = await res.json();
 
       if (result.isHoneypot) {
         log('⚠️ ОБНАРУЖЕНА ПОДОЗРИТЕЛЬНАЯ АКТИВНОСТЬ', 'error');
-        log('📩 Аккаунт помечен. Администратор уведомлён.', 'muted');
+        log('📩 Аккаунт помечен.', 'muted');
         state.banned = true;
         if (state.mining) commands.stop();
         return null;
@@ -133,7 +140,9 @@
   async function fetchPoolState() {
     const data = await apiCall('pool', {});
     if (data) {
-      log(`⛏️ ПУЛ: блок #${data.blocks} | сложность ${data.difficulty} | всего добыто ${data.totalReward} MIRA`, 'info');
+      state.difficulty = data.difficulty || 1;
+      state.blocks = data.blocks || 0;
+      log(`⛏️ ПУЛ: блок #${data.blocks} | сложность ${data.difficulty} | добыто ${data.totalReward} MIRA`, 'info');
     }
   }
 
@@ -153,66 +162,64 @@
   }
 
   // ============================================================
-  //  МАЙНИНГ
+  //  МАЙНГ — SHA-256 PoW
   // ============================================================
-  function startMiningLoop() {
-    if (state.banned) {
-      log('❌ Аккаунт заблокирован. Майнинг невозможен.', 'error');
-      return;
-    }
-    if (miningInterval) clearInterval(miningInterval);
-    const interval = state.ecoMode ? 2000 : 500;
-    const iterations = state.ecoMode ? 8000 : 30000;
+  async function mineOnce() {
+    if (!miningActive || state.banned) return;
 
-    miningInterval = setInterval(() => {
-      if (!state.mining || state.banned) return;
-      const now = performance.now();
-      if (now - lastTickTime < interval * 0.5) return;
-      lastTickTime = now;
+    const iterations = state.ecoMode ? 5000 : 20000;
+    const target = state.difficulty;
+    const requiredZeros = Math.min(target, 8);
+    const prefix = '0'.repeat(requiredZeros);
 
-      const start = performance.now();
-      let hashes = 0;
-      const target = state.difficulty * 100000;
+    const start = performance.now();
+    let hashes = 0;
 
-      for (let i = 0; i < iterations; i++) {
-        const nonce = Math.random().toString(36).substring(2) + Date.now() + i;
-        let hash = 0;
-        for (let j = 0; j < nonce.length; j++) {
-          hash = ((hash << 5) - hash) + nonce.charCodeAt(j);
-          hash = hash & hash;
+    for (let i = 0; i < iterations; i++) {
+      if (!miningActive) break;
+
+      const nonce = Math.random().toString(36).substring(2) + Date.now().toString(36) + i.toString(36);
+      const hash = await sha256(nonce + ':' + target);
+      hashes++;
+      state.totalHashes++;
+
+      if (hash.startsWith(prefix)) {
+        log(`🎯 Найден блок! ${hash.substring(0,16)}...`, 'highlight');
+        const res = await apiCall('submit', {
+          hash: hash,
+          nonce: nonce,
+          difficulty: target
+        });
+        if (res && res.success) {
+          state.blocks = res.block;
+          const reward = res.reward || 50;
+          state.pending += reward;
+          state.difficulty = res.difficulty || target + 1;
+          log(`⛏️ БЛОК #${state.blocks} | +${reward} MIRA | Сложность ${state.difficulty}`, 'success');
+          saveState();
+        } else if (res && res.error) {
+          log(`[-] ${res.error}`, 'error');
         }
-        const hex = (hash >>> 0).toString(16).padStart(8, '0');
-        hashes++;
-        state.totalHashes++;
-
-        // Требуем 8 ведущих нулей (как в Worker)
-        if (hex.substring(0, 8) === '00000000' && parseInt(hex.substring(0, 8), 16) < (0xFFFFFFFF / target)) {
-          apiCall('submit', {
-            hash: hex,
-            nonce: nonce,
-            difficulty: state.difficulty
-          }).then(res => {
-            if (res && res.success) {
-              state.blocks = res.block;
-              const reward = res.reward || Math.floor(50 + state.difficulty * 8 + Math.random() * 25);
-              state.pending += reward;
-              state.difficulty = res.difficulty || Math.floor(state.difficulty * 1.03) + 1;
-              log(`⛏️ БЛОК #${state.blocks} | +${reward} MIRA | Сложность ${state.difficulty}`, 'success');
-              saveState();
-            }
-          });
-          break;
-        }
+        break;
       }
+    }
 
-      const elapsed = (performance.now() - start) / 1000;
-      state.hashrate = state.hashrate * 0.6 + (hashes / elapsed / 1000000) * 0.4;
+    const elapsed = (performance.now() - start) / 1000;
+    if (elapsed > 0) {
+      state.hashrate = state.hashrate * 0.6 + (hashes / elapsed / 1000) * 0.4;
       state.power = Math.floor(state.hashrate * 1.2 + (state.ecoMode ? 10 : 30));
+    }
 
-      document.getElementById('uptime').textContent = Math.floor((Date.now() - state.startTime) / 1000) + 's';
-      document.getElementById('pid').textContent = state.pid;
-      saveState();
-    }, interval);
+    document.getElementById('uptime').textContent = Math.floor((Date.now() - state.startTime) / 1000) + 's';
+    saveState();
+  }
+
+  function miningLoop() {
+    if (!miningActive || state.banned) return;
+    mineOnce().then(() => {
+      const delay = state.ecoMode ? 2000 : 100;
+      setTimeout(miningLoop, delay);
+    });
   }
 
   // ============================================================
@@ -225,19 +232,20 @@
     },
     start() {
       if (state.banned) { log('❌ Аккаунт заблокирован', 'error'); return; }
-      if (state.mining) { log('❌ Уже запущен', 'error'); return; }
+      if (miningActive) { log('❌ Уже запущен', 'error'); return; }
+      miningActive = true;
       state.mining = true;
       document.getElementById('status-indicator').className = 'status-led led-green';
       document.getElementById('status-text').textContent = 'MINING';
-      log(`⛏️ Майнинг запущен (${state.ecoMode?'ECO':'PRO'})`, 'success');
-      startMiningLoop();
+      log(`⛏️ Майнинг запущен (${state.ecoMode?'ECO':'PRO'}) | SHA-256 PoW | сложность: ${state.difficulty}`, 'success');
+      miningLoop();
     },
     stop() {
-      if (!state.mining) { log('❌ Не запущен', 'error'); return; }
+      if (!miningActive) { log('❌ Не запущен', 'error'); return; }
+      miningActive = false;
       state.mining = false;
       document.getElementById('status-indicator').className = 'status-led led-red';
       document.getElementById('status-text').textContent = 'OFFLINE';
-      if (miningInterval) { clearInterval(miningInterval); miningInterval = null; }
       log('⏹️ Остановлен', 'highlight');
       saveState();
     },
@@ -245,25 +253,26 @@
       if (state.banned) { log('❌ Аккаунт заблокирован', 'error'); return; }
       log('📊 СТАТУС:', 'highlight');
       log(`  Режим: ${state.ecoMode?'🌿 ECO':'⚡ PRO'}`, 'info');
-      log(`  Хешрейт: ${state.hashrate.toFixed(2)} MH/s`, 'info');
+      log(`  Хешрейт: ${state.hashrate.toFixed(2)} kH/s`, 'info');
+      log(`  Всего хэшей: ${state.totalHashes.toLocaleString()}`, 'info');
       log(`  Блоков: ${state.blocks}`, 'info');
       log(`  Ожидает: ${state.pending.toFixed(2)} MIRA`, 'info');
       log(`  Сложность: ${state.difficulty}`, 'info');
       log(`  Кошелёк: ${state.userWallet || 'НЕ НАСТРОЕН'}`, 'info');
     },
     blocks() {
-      log('📜 ПОСЛЕДНИЕ БЛОКИ (глобальный пул):', 'highlight');
+      log('📜 ПОСЛЕДНИЕ БЛОКИ:', 'highlight');
       for (let i = 0; i < 10; i++) {
         const h = state.blocks - i;
         if (h <= 0) break;
-        log(`  #${h} | +${(50+Math.floor(Math.random()*30))} MIRA`, 'info');
+        log(`  #${h}`, 'info');
       }
     },
     setwallet(args) {
       if (!args || args.length === 0) { log('❌ Укажите адрес', 'error'); return; }
       const addr = args[0];
-      if (!/^[EQ][A-Za-z0-9_-]{47}$/.test(addr) && !/^[UQ][A-Za-z0-9_-]{47}$/.test(addr)) {
-        log('❌ Невалидный адрес (должен начинаться с EQ/UQ, длина 48 символов)', 'error');
+      if (!/^[EQ][A-Za-z0-9_-]{47}$/.test(addr)) {
+        log('❌ Невалидный адрес (EQ/UQ, 48 символов)', 'error');
         return;
       }
       state.userWallet = addr;
@@ -276,13 +285,12 @@
       if (state.pending < 0.1) { log('❌ Нет награды', 'error'); return; }
       if (!state.userWallet) { log('❌ Настройте кошелёк: setwallet EQ...', 'error'); return; }
       const amount = state.pending;
-      const code = 'MIRA-' + Math.random().toString(36).substring(2,8).toUpperCase();
       state.pending = 0;
 
-      apiCall('claim', { amount, wallet: state.userWallet, code }).then(res => {
+      apiCall('claim', { amount, wallet: state.userWallet }).then(res => {
         if (res?.success) {
           log(`✅ ЗАЯВКА: ${amount.toFixed(2)} MIRA`, 'success');
-          log(`🔑 Код: ${code}`, 'highlight');
+          log(`🔑 Код: ${res.code}`, 'highlight');
         } else if (res?.error) {
           log(`❌ ${res.error}`, 'error');
           state.pending = amount;
@@ -299,27 +307,19 @@
     eco() {
       state.ecoMode = !state.ecoMode;
       log(`🔋 Режим: ${state.ecoMode?'🌿 ECO':'⚡ PRO'}`, 'highlight');
-      if (state.mining) startMiningLoop();
       saveState();
     },
-    pool() {
-      fetchPoolState();
-    },
-    top() {
-      fetchTop();
-    },
+    pool() { fetchPoolState(); },
+    top() { fetchTop(); },
     ref() {
       log(`🔗 Ссылка: https://t.me/Mira_networks_bot?start=ref_${state.refCode}`, 'highlight');
     },
     buy() { window.open(CONFIG.stonfiSwap, '_blank'); },
     stonfi() { window.open(CONFIG.stonfiPool, '_blank'); },
     clear() { while (output.firstChild) output.removeChild(output.firstChild); log('🧹 Очищено', 'muted'); },
-    exit() { if (state.mining) commands.stop(); setTimeout(() => location.reload(), 500); }
+    exit() { if (miningActive) commands.stop(); setTimeout(() => location.reload(), 500); }
   };
 
-  // ============================================================
-  //  СОХРАНЕНИЕ
-  // ============================================================
   function saveState() {
     try { localStorage.setItem('mira_terminal', JSON.stringify(state)); } catch(e) {}
   }
@@ -332,9 +332,6 @@
     } catch(e) {}
   }
 
-  // ============================================================
-  //  ВВОД
-  // ============================================================
   input.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
     const cmd = input.value.trim();
@@ -344,19 +341,16 @@
     const parts = cmd.split(' ');
     const name = parts[0].toLowerCase();
     if (commands[name]) commands[name](parts.slice(1));
-    else log(`❌ Команда не найдена`, 'error');
+    else log('❌ Команда не найдена', 'error');
   });
 
-  // ============================================================
-  //  СТАРТ
-  // ============================================================
   loadState();
   document.getElementById('pid').textContent = state.pid;
 
-  log('⛏️ MIRA TERMINAL v7.0 — ЗАЩИЩЁННАЯ ВЕРСИЯ', 'highlight');
+  log('⛏️ MIRA TERMINAL v7.1 — HARDENED', 'highlight');
   log(`📡 API: ${API_BASE}`, 'muted');
   log(`🌿 Режим: ${state.ecoMode?'ECO':'PRO'}`, 'info');
-  log(`🛡️ Защита: усиленный PoW (8 нулей), nonce-кеш, кулдаун 5с`, 'success');
+  log(`🛡️ SHA-256 PoW | HMAC initData | nonce-кеш | кулдаун 5с`, 'success');
   if (state.userWallet) log(`📬 Кошелёк: ${state.userWallet}`, 'success');
   else log('⚠️ Настройте кошелёк: setwallet EQ...', 'error');
   log('💡 Введите help', 'muted');
@@ -367,7 +361,8 @@
   if (state.mining && !state.banned) {
     document.getElementById('status-indicator').className = 'status-led led-green';
     document.getElementById('status-text').textContent = 'MINING';
-    startMiningLoop();
+    miningActive = true;
+    miningLoop();
   }
 
   setInterval(saveState, 15000);
