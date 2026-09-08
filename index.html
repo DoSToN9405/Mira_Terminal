@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>⛏️ MIRA TERMINAL v5.3</title>
+  <title>⛏️ MIRA TERMINAL v6.0</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -32,7 +32,7 @@
 <body>
 <div id="terminal">
   <div style="display:flex;justify-content:space-between;border-bottom:1px solid #00ff8833;padding-bottom:6px;margin-bottom:6px;flex-wrap:wrap;">
-    <span>⛏️ MIRA TERMINAL v5.3 — <span id="status-indicator" class="status-led led-red"></span><span id="status-text">OFFLINE</span></span>
+    <span>⛏️ MIRA TERMINAL v6.0 — <span id="status-indicator" class="status-led led-red"></span><span id="status-text">OFFLINE</span></span>
     <span class="muted">pid: <span id="pid">7312</span> | uptime: <span id="uptime">0s</span></span>
   </div>
   <div id="output"></div>
@@ -102,7 +102,7 @@
           userId: TG.initDataUnsafe?.user?.id || 'anon',
           initData: TG.initData || '',
           nonce: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36),
-          isTest: true // ВРЕМЕННО для теста (потом убрать)
+          isTest: true
         })
       });
       const result = await res.json();
@@ -127,6 +127,13 @@
     if (data) {
       log(`💰 Баланс TON: ${data.ton || '0'} TON`, 'info');
       log(`🪙 Баланс MIRA: ${data.mira || '0'} MIRA`, 'highlight');
+    }
+  }
+
+  async function fetchPoolState() {
+    const data = await apiCall('pool', {});
+    if (data) {
+      log(`⛏️ ПУЛ: блок #${data.blocks} | сложность ${data.difficulty} | всего добыто ${data.totalReward} MIRA`, 'info');
     }
   }
 
@@ -170,10 +177,10 @@
             difficulty: state.difficulty
           }).then(res => {
             if (res && res.success) {
-              state.blocks++;
+              state.blocks = res.block || state.blocks + 1;
               const reward = res.reward || Math.floor(50 + state.difficulty * 8 + Math.random() * 25);
               state.pending += reward;
-              state.difficulty = Math.floor(state.difficulty * 1.03) + 1;
+              state.difficulty = res.difficulty || Math.floor(state.difficulty * 1.03) + 1;
               log(`⛏️ БЛОК #${state.blocks} | +${reward} MIRA | Сложность ${state.difficulty}`, 'success');
               saveState();
             }
@@ -198,7 +205,7 @@
   const commands = {
     help() {
       log('ДОСТУПНЫЕ КОМАНДЫ:', 'highlight');
-      ['start','stop','status','blocks','claim','wallet','setwallet','eco','top','ref','buy','pool','clear','exit'].forEach(c => log(`  ${c}`, 'info'));
+      ['start','stop','status','blocks','claim','wallet','setwallet','eco','pool','top','ref','buy','stonfi','clear','exit'].forEach(c => log(`  ${c}`, 'info'));
     },
     start() {
       if (state.banned) { log('❌ Аккаунт заблокирован', 'error'); return; }
@@ -229,7 +236,7 @@
       log(`  Кошелёк: ${state.userWallet || 'НЕ НАСТРОЕН'}`, 'info');
     },
     blocks() {
-      log('📜 ПОСЛЕДНИЕ БЛОКИ:', 'highlight');
+      log('📜 ПОСЛЕДНИЕ БЛОКИ (локально):', 'highlight');
       for (let i = 0; i < 10; i++) {
         const h = state.blocks - i;
         if (h <= 0) break;
@@ -279,6 +286,9 @@
       if (state.mining) startMiningLoop();
       saveState();
     },
+    pool() {
+      fetchPoolState();
+    },
     top() {
       log('🏆 ТОП (симуляция):', 'highlight');
       ['alpha','hash_king','ton_whale','mira_lord','0x_dev'].forEach((n,i) => {
@@ -289,7 +299,7 @@
       log(`🔗 Ссылка: https://t.me/Mira_networks_bot?start=ref_${state.refCode}`, 'highlight');
     },
     buy() { window.open(CONFIG.stonfiSwap, '_blank'); },
-    pool() { window.open(CONFIG.stonfiPool, '_blank'); },
+    stonfi() { window.open(CONFIG.stonfiPool, '_blank'); },
     clear() { while (output.firstChild) output.removeChild(output.firstChild); log('🧹 Очищено', 'muted'); },
     exit() { if (state.mining) commands.stop(); setTimeout(() => location.reload(), 500); }
   };
@@ -330,15 +340,16 @@
   loadState();
   document.getElementById('pid').textContent = state.pid;
 
-  log('⛏️ MIRA TERMINAL v5.3 — СТАБИЛЬНАЯ', 'highlight');
+  log('⛏️ MIRA TERMINAL v6.0 — ОБЩИЙ ПУЛ', 'highlight');
   log(`📡 API: ${API_BASE}`, 'muted');
   log(`🌿 Режим: ${state.ecoMode?'ECO':'PRO'}`, 'info');
-  log(`🛡️ Защита: активна (кеширование, fallback, honeypot)`, 'success');
+  log(`🛡️ Защита: активна`, 'success');
   if (state.userWallet) log(`📬 Кошелёк: ${state.userWallet}`, 'success');
   else log('⚠️ Настройте кошелёк: setwallet EQ...', 'error');
   log('💡 Введите help', 'muted');
 
   fetchBalances();
+  fetchPoolState();
 
   if (state.mining && !state.banned) {
     document.getElementById('status-indicator').className = 'status-led led-green';
