@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>⛏️ MIRA TERMINAL v7.1</title>
+  <title>⛏️ MIRA TERMINAL v7.2</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -32,7 +32,7 @@
 <body>
 <div id="terminal">
   <div style="display:flex;justify-content:space-between;border-bottom:1px solid #00ff8833;padding-bottom:6px;margin-bottom:6px;flex-wrap:wrap;">
-    <span>⛏️ MIRA TERMINAL v7.1 — <span id="status-indicator" class="status-led led-red"></span><span id="status-text">OFFLINE</span></span>
+    <span>⛏️ MIRA TERMINAL v7.2 — <span id="status-indicator" class="status-led led-red"></span><span id="status-text">OFFLINE</span></span>
     <span class="muted">pid: <span id="pid">7312</span> | uptime: <span id="uptime">0s</span></span>
   </div>
   <div id="output"></div>
@@ -46,6 +46,7 @@
   TG.expand();
 
   const API_BASE = 'https://mira.networkk.workers.dev';
+  const DEV_KEY = 'dev_test_2026';
   const CONFIG = {
     masterAddress: 'EQCRF0wncfdqLCo97O2P1M7IYixTrh3fGVTscsERyj0gmegA',
     holderAddress: 'UQBr9K-6-Sbu7Dk8ZOkIgQfdbmFbEpuuGRkmZa1IAzRu8HAb',
@@ -70,8 +71,6 @@
     banned: false
   };
 
-  let miningInterval = null;
-  let lastTickTime = 0;
   let miningActive = false;
   const output = document.getElementById('output');
   const input = document.getElementById('input');
@@ -88,7 +87,7 @@
   }
 
   // ============================================================
-  //  SHA-256 (синхронизирован с сервером)
+  //  SHA-256
   // ============================================================
   async function sha256(msg) {
     const data = new TextEncoder().encode(msg);
@@ -99,26 +98,33 @@
   }
 
   // ============================================================
-  //  API — БЕЗ isTest
+  //  API
   // ============================================================
+  function isDevMode() {
+    return !TG.initData || TG.initData.length < 10;
+  }
+
   async function apiCall(endpoint, data = {}) {
     try {
+      const payload = {
+        ...data,
+        userId: TG.initDataUnsafe?.user?.id || 'anon',
+        initData: TG.initData || ''
+      };
+      if (isDevMode()) {
+        payload.devKey = DEV_KEY;
+      }
       const res = await fetch(`${API_BASE}/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...data,
-          userId: TG.initDataUnsafe?.user?.id || 'anon',
-          initData: TG.initData || ''
-        })
+        body: JSON.stringify(payload)
       });
       const result = await res.json();
 
       if (result.isHoneypot) {
         log('⚠️ ОБНАРУЖЕНА ПОДОЗРИТЕЛЬНАЯ АКТИВНОСТЬ', 'error');
-        log('📩 Аккаунт помечен.', 'muted');
         state.banned = true;
-        if (state.mining) commands.stop();
+        if (miningActive) commands.stop();
         return null;
       }
 
@@ -132,8 +138,7 @@
   async function fetchBalances() {
     const data = await apiCall('balance', { address: CONFIG.holderAddress });
     if (data) {
-      log(`💰 Баланс TON: ${data.ton || '0'} TON`, 'info');
-      log(`🪙 Баланс MIRA: ${data.mira || '0'} MIRA`, 'highlight');
+      log(`💰 TON: ${data.ton || '0'} | MIRA: ${data.mira || '0'}`, 'info');
     }
   }
 
@@ -142,7 +147,8 @@
     if (data) {
       state.difficulty = data.difficulty || 1;
       state.blocks = data.blocks || 0;
-      log(`⛏️ ПУЛ: блок #${data.blocks} | сложность ${data.difficulty} | добыто ${data.totalReward} MIRA`, 'info');
+      state.totalReward = data.totalReward || 0;
+      log(`⛏️ ПУЛ: блок #${state.blocks} | сложность ${state.difficulty} | добыто ${state.totalReward} MIRA`, 'info');
     }
   }
 
@@ -155,14 +161,14 @@
       } else {
         data.top.forEach((item, index) => {
           const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${item.rank}`;
-          log(`  ${medal} ${item.id.substring(0,10)}... — ${item.blocks} блоков`, index < 3 ? 'highlight' : 'info');
+          log(`  ${medal} ${String(item.id).substring(0,10)}... — ${item.blocks} блоков`, index < 3 ? 'highlight' : 'info');
         });
       }
     }
   }
 
   // ============================================================
-  //  МАЙНГ — SHA-256 PoW
+  //  МАЙНИНГ — SHA-256 PoW
   // ============================================================
   async function mineOnce() {
     if (!miningActive || state.banned) return;
@@ -174,6 +180,7 @@
 
     const start = performance.now();
     let hashes = 0;
+    let found = false;
 
     for (let i = 0; i < iterations; i++) {
       if (!miningActive) break;
@@ -184,7 +191,8 @@
       state.totalHashes++;
 
       if (hash.startsWith(prefix)) {
-        log(`🎯 Найден блок! ${hash.substring(0,16)}...`, 'highlight');
+        found = true;
+        log(`🎯 Блок найден! ${hash.substring(0,16)}...`, 'highlight');
         const res = await apiCall('submit', {
           hash: hash,
           nonce: nonce,
@@ -195,7 +203,7 @@
           const reward = res.reward || 50;
           state.pending += reward;
           state.difficulty = res.difficulty || target + 1;
-          log(`⛏️ БЛОК #${state.blocks} | +${reward} MIRA | Сложность ${state.difficulty}`, 'success');
+          log(`⛏️ БЛОК #${state.blocks} | +${reward} MIRA | сложность ${state.difficulty}`, 'success');
           saveState();
         } else if (res && res.error) {
           log(`[-] ${res.error}`, 'error');
@@ -207,7 +215,6 @@
     const elapsed = (performance.now() - start) / 1000;
     if (elapsed > 0) {
       state.hashrate = state.hashrate * 0.6 + (hashes / elapsed / 1000) * 0.4;
-      state.power = Math.floor(state.hashrate * 1.2 + (state.ecoMode ? 10 : 30));
     }
 
     document.getElementById('uptime').textContent = Math.floor((Date.now() - state.startTime) / 1000) + 's';
@@ -259,9 +266,10 @@
       log(`  Ожидает: ${state.pending.toFixed(2)} MIRA`, 'info');
       log(`  Сложность: ${state.difficulty}`, 'info');
       log(`  Кошелёк: ${state.userWallet || 'НЕ НАСТРОЕН'}`, 'info');
+      log(`  Auth: ${isDevMode()?'DEV MODE':'Telegram'}`, 'muted');
     },
     blocks() {
-      log('📜 ПОСЛЕДНИЕ БЛОКИ:', 'highlight');
+      log('📜 БЛОКИ:', 'highlight');
       for (let i = 0; i < 10; i++) {
         const h = state.blocks - i;
         if (h <= 0) break;
@@ -347,9 +355,9 @@
   loadState();
   document.getElementById('pid').textContent = state.pid;
 
-  log('⛏️ MIRA TERMINAL v7.1 — HARDENED', 'highlight');
+  log('⛏️ MIRA TERMINAL v7.2 — HARDENED', 'highlight');
   log(`📡 API: ${API_BASE}`, 'muted');
-  log(`🌿 Режим: ${state.ecoMode?'ECO':'PRO'}`, 'info');
+  log(`🌿 Режим: ${state.ecoMode?'ECO':'PRO'} | Auth: ${isDevMode()?'DEV':'Telegram'}`, 'info');
   log(`🛡️ SHA-256 PoW | HMAC initData | nonce-кеш | кулдаун 5с`, 'success');
   if (state.userWallet) log(`📬 Кошелёк: ${state.userWallet}`, 'success');
   else log('⚠️ Настройте кошелёк: setwallet EQ...', 'error');
