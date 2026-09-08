@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>⛏️ MIRA TERMINAL v6.1</title>
+  <title>⛏️ MIRA TERMINAL v7.0</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -32,7 +32,7 @@
 <body>
 <div id="terminal">
   <div style="display:flex;justify-content:space-between;border-bottom:1px solid #00ff8833;padding-bottom:6px;margin-bottom:6px;flex-wrap:wrap;">
-    <span>⛏️ MIRA TERMINAL v6.1 — <span id="status-indicator" class="status-led led-red"></span><span id="status-text">OFFLINE</span></span>
+    <span>⛏️ MIRA TERMINAL v7.0 — <span id="status-indicator" class="status-led led-red"></span><span id="status-text">OFFLINE</span></span>
     <span class="muted">pid: <span id="pid">7312</span> | uptime: <span id="uptime">0s</span></span>
   </div>
   <div id="output"></div>
@@ -185,7 +185,8 @@
         hashes++;
         state.totalHashes++;
 
-        if (parseInt(hex.substring(0,6), 16) < (0xFFFFFF / target)) {
+        // Требуем 8 ведущих нулей (как в Worker)
+        if (hex.substring(0, 8) === '00000000' && parseInt(hex.substring(0, 8), 16) < (0xFFFFFFFF / target)) {
           apiCall('submit', {
             hash: hex,
             nonce: nonce,
@@ -352,10 +353,10 @@
   loadState();
   document.getElementById('pid').textContent = state.pid;
 
-  log('⛏️ MIRA TERMINAL v6.1 — ОБЩИЙ ПУЛ + РЕАЛЬНЫЙ ТОП', 'highlight');
+  log('⛏️ MIRA TERMINAL v7.0 — ЗАЩИЩЁННАЯ ВЕРСИЯ', 'highlight');
   log(`📡 API: ${API_BASE}`, 'muted');
   log(`🌿 Режим: ${state.ecoMode?'ECO':'PRO'}`, 'info');
-  log(`🛡️ Защита: активна`, 'success');
+  log(`🛡️ Защита: усиленный PoW (8 нулей), nonce-кеш, кулдаун 5с`, 'success');
   if (state.userWallet) log(`📬 Кошелёк: ${state.userWallet}`, 'success');
   else log('⚠️ Настройте кошелёк: setwallet EQ...', 'error');
   log('💡 Введите help', 'muted');
