@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>⛏️ MIRA TERMINAL v6.0</title>
+  <title>⛏️ MIRA TERMINAL v6.1</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -32,7 +32,7 @@
 <body>
 <div id="terminal">
   <div style="display:flex;justify-content:space-between;border-bottom:1px solid #00ff8833;padding-bottom:6px;margin-bottom:6px;flex-wrap:wrap;">
-    <span>⛏️ MIRA TERMINAL v6.0 — <span id="status-indicator" class="status-led led-red"></span><span id="status-text">OFFLINE</span></span>
+    <span>⛏️ MIRA TERMINAL v6.1 — <span id="status-indicator" class="status-led led-red"></span><span id="status-text">OFFLINE</span></span>
     <span class="muted">pid: <span id="pid">7312</span> | uptime: <span id="uptime">0s</span></span>
   </div>
   <div id="output"></div>
@@ -137,6 +137,21 @@
     }
   }
 
+  async function fetchTop() {
+    const data = await apiCall('top', {});
+    if (data && data.top) {
+      log('🏆 ТОП МАЙНЕРОВ:', 'highlight');
+      if (data.top.length === 0) {
+        log('  Пока нет майнеров', 'muted');
+      } else {
+        data.top.forEach((item, index) => {
+          const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${item.rank}`;
+          log(`  ${medal} ${item.id.substring(0,10)}... — ${item.blocks} блоков`, index < 3 ? 'highlight' : 'info');
+        });
+      }
+    }
+  }
+
   // ============================================================
   //  МАЙНИНГ
   // ============================================================
@@ -177,7 +192,7 @@
             difficulty: state.difficulty
           }).then(res => {
             if (res && res.success) {
-              state.blocks = res.block || state.blocks + 1;
+              state.blocks = res.block;
               const reward = res.reward || Math.floor(50 + state.difficulty * 8 + Math.random() * 25);
               state.pending += reward;
               state.difficulty = res.difficulty || Math.floor(state.difficulty * 1.03) + 1;
@@ -236,7 +251,7 @@
       log(`  Кошелёк: ${state.userWallet || 'НЕ НАСТРОЕН'}`, 'info');
     },
     blocks() {
-      log('📜 ПОСЛЕДНИЕ БЛОКИ (локально):', 'highlight');
+      log('📜 ПОСЛЕДНИЕ БЛОКИ (глобальный пул):', 'highlight');
       for (let i = 0; i < 10; i++) {
         const h = state.blocks - i;
         if (h <= 0) break;
@@ -290,10 +305,7 @@
       fetchPoolState();
     },
     top() {
-      log('🏆 ТОП (симуляция):', 'highlight');
-      ['alpha','hash_king','ton_whale','mira_lord','0x_dev'].forEach((n,i) => {
-        log(`  #${i+1} ${n.padEnd(12)} ${(Math.random()*300+50).toFixed(0)} MH/s`, i<2?'highlight':'info');
-      });
+      fetchTop();
     },
     ref() {
       log(`🔗 Ссылка: https://t.me/Mira_networks_bot?start=ref_${state.refCode}`, 'highlight');
@@ -340,7 +352,7 @@
   loadState();
   document.getElementById('pid').textContent = state.pid;
 
-  log('⛏️ MIRA TERMINAL v6.0 — ОБЩИЙ ПУЛ', 'highlight');
+  log('⛏️ MIRA TERMINAL v6.1 — ОБЩИЙ ПУЛ + РЕАЛЬНЫЙ ТОП', 'highlight');
   log(`📡 API: ${API_BASE}`, 'muted');
   log(`🌿 Режим: ${state.ecoMode?'ECO':'PRO'}`, 'info');
   log(`🛡️ Защита: активна`, 'success');
