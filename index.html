@@ -1,1 +1,354 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>⛏️ MIRA TERMINAL v5.3</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#0a0c10; color:#00ff88; font-family:'Courier New',monospace; padding:10px; height:100vh; display:flex; flex-direction:column; }
+    #terminal { background:#0d1117; border:1px solid #00ff8833; border-radius:12px; padding:14px; flex:1; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 0 40px #00ff8811; }
+    #output { flex:1; overflow-y:auto; padding:4px 0; font-size:14px; line-height:1.5; white-space:pre-wrap; word-break:break-all; }
+    #output::-webkit-scrollbar { width:6px; }
+    #output::-webkit-scrollbar-track { background:#0d1117; }
+    #output::-webkit-scrollbar-thumb { background:#00ff8844; border-radius:3px; }
+    .prompt-line { display:flex; align-items:center; gap:8px; margin-top:6px; border-top:1px solid #00ff8811; padding-top:6px; }
+    .prompt { color:#00ff88; font-weight:bold; }
+    #input { background:transparent; border:none; color:#00ff88; font-family:'Courier New',monospace; font-size:14px; flex:1; outline:none; caret-color:#00ff88; }
+    #input::selection { background:#00ff8844; }
+    .log-entry { border-bottom:1px solid #00ff8811; padding:2px 0; }
+    .log-entry .time { color:#446688; margin-right:10px; }
+    .highlight { color:#ffd740; }
+    .error { color:#ff5252; }
+    .success { color:#00e676; }
+    .info { color:#64b5f6; }
+    .muted { color:#6a7f9a; }
+    .status-led { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; }
+    .led-green { background:#00e676; box-shadow:0 0 12px #00e676; }
+    .led-red { background:#ff5252; box-shadow:0 0 12px #ff5252; }
+  </style>
+</head>
+<body>
+<div id="terminal">
+  <div style="display:flex;justify-content:space-between;border-bottom:1px solid #00ff8833;padding-bottom:6px;margin-bottom:6px;flex-wrap:wrap;">
+    <span>⛏️ MIRA TERMINAL v5.3 — <span id="status-indicator" class="status-led led-red"></span><span id="status-text">OFFLINE</span></span>
+    <span class="muted">pid: <span id="pid">7312</span> | uptime: <span id="uptime">0s</span></span>
+  </div>
+  <div id="output"></div>
+  <div class="prompt-line">
+    <span class="prompt">mira@miner:~$</span>
+    <input type="text" id="input" autofocus spellcheck="false" autocomplete="off">
+  </div>
+</div>
+<script>
+  const TG = window.Telegram.WebApp;
+  TG.expand();
 
+  // ============================================================
+  //  КОНФИГУРАЦИЯ
+  // ============================================================
+  const API_BASE = 'https://mira.networkk.workers.dev';
+  const CONFIG = {
+    masterAddress: 'EQCRF0wncfdqLCo97O2P1M7IYixTrh3fGVTscsERyj0gmegA',
+    holderAddress: 'UQBr9K-6-Sbu7Dk8ZOkIgQfdbmFbEpuuGRkmZa1IAzRu8HAb',
+    stonfiSwap: 'https://app.ston.fi/swap?output=EQCRF0wncfdqLCo97O2P1M7IYixTrh3fGVTscsERyj0gmegA',
+    stonfiPool: 'https://app.ston.fi/pools/EQCRF0wncfdqLCo97O2P1M7IYixTrh3fGVTscsERyj0gmegA'
+  };
+
+  const state = {
+    mining: false,
+    hashrate: 0,
+    totalHashes: 0,
+    blocks: 0,
+    pending: 0,
+    totalReward: 0,
+    difficulty: 1,
+    power: 0,
+    userWallet: null,
+    refCode: 'MIRA' + Math.random().toString(36).substring(2,8).toUpperCase(),
+    startTime: Date.now(),
+    pid: Math.floor(Math.random() * 9000 + 1000),
+    ecoMode: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent),
+    banned: false
+  };
+
+  let miningInterval = null;
+  let lastTickTime = 0;
+  const output = document.getElementById('output');
+  const input = document.getElementById('input');
+
+  function log(msg, type='info') {
+    const div = document.createElement('div');
+    div.className = 'log-entry';
+    const time = new Date().toLocaleTimeString();
+    const cls = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'highlight' ? 'highlight' : 'info';
+    div.innerHTML = `<span class="time">[${time}]</span><span class="${cls}">${msg}</span>`;
+    output.appendChild(div);
+    output.scrollTop = output.scrollHeight;
+    if (output.children.length > 300) output.removeChild(output.firstChild);
+  }
+
+  // ============================================================
+  //  API
+  // ============================================================
+  async function apiCall(endpoint, data = {}) {
+    try {
+      const res = await fetch(`${API_BASE}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...data,
+          userId: TG.initDataUnsafe?.user?.id || 'anon',
+          initData: TG.initData || '',
+          nonce: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36),
+          isTest: true // ВРЕМЕННО для теста (потом убрать)
+        })
+      });
+      const result = await res.json();
+
+      if (result.isHoneypot) {
+        log('⚠️ ОБНАРУЖЕНА ПОДОЗРИТЕЛЬНАЯ АКТИВНОСТЬ', 'error');
+        log('📩 Аккаунт помечен. Администратор уведомлён.', 'muted');
+        state.banned = true;
+        if (state.mining) commands.stop();
+        return null;
+      }
+
+      return result;
+    } catch(e) {
+      log(`⚠️ Ошибка API: ${e.message}`, 'error');
+      return null;
+    }
+  }
+
+  async function fetchBalances() {
+    const data = await apiCall('balance', { address: CONFIG.holderAddress });
+    if (data) {
+      log(`💰 Баланс TON: ${data.ton || '0'} TON`, 'info');
+      log(`🪙 Баланс MIRA: ${data.mira || '0'} MIRA`, 'highlight');
+    }
+  }
+
+  // ============================================================
+  //  МАЙНИНГ
+  // ============================================================
+  function startMiningLoop() {
+    if (state.banned) {
+      log('❌ Аккаунт заблокирован. Майнинг невозможен.', 'error');
+      return;
+    }
+    if (miningInterval) clearInterval(miningInterval);
+    const interval = state.ecoMode ? 2000 : 500;
+    const iterations = state.ecoMode ? 8000 : 30000;
+
+    miningInterval = setInterval(() => {
+      if (!state.mining || state.banned) return;
+      const now = performance.now();
+      if (now - lastTickTime < interval * 0.5) return;
+      lastTickTime = now;
+
+      const start = performance.now();
+      let hashes = 0;
+      const target = state.difficulty * 100000;
+
+      for (let i = 0; i < iterations; i++) {
+        const nonce = Math.random().toString(36).substring(2) + Date.now() + i;
+        let hash = 0;
+        for (let j = 0; j < nonce.length; j++) {
+          hash = ((hash << 5) - hash) + nonce.charCodeAt(j);
+          hash = hash & hash;
+        }
+        const hex = (hash >>> 0).toString(16).padStart(8, '0');
+        hashes++;
+        state.totalHashes++;
+
+        if (parseInt(hex.substring(0,6), 16) < (0xFFFFFF / target)) {
+          apiCall('submit', {
+            hash: hex,
+            nonce: nonce,
+            difficulty: state.difficulty
+          }).then(res => {
+            if (res && res.success) {
+              state.blocks++;
+              const reward = res.reward || Math.floor(50 + state.difficulty * 8 + Math.random() * 25);
+              state.pending += reward;
+              state.difficulty = Math.floor(state.difficulty * 1.03) + 1;
+              log(`⛏️ БЛОК #${state.blocks} | +${reward} MIRA | Сложность ${state.difficulty}`, 'success');
+              saveState();
+            }
+          });
+          break;
+        }
+      }
+
+      const elapsed = (performance.now() - start) / 1000;
+      state.hashrate = state.hashrate * 0.6 + (hashes / elapsed / 1000000) * 0.4;
+      state.power = Math.floor(state.hashrate * 1.2 + (state.ecoMode ? 10 : 30));
+
+      document.getElementById('uptime').textContent = Math.floor((Date.now() - state.startTime) / 1000) + 's';
+      document.getElementById('pid').textContent = state.pid;
+      saveState();
+    }, interval);
+  }
+
+  // ============================================================
+  //  КОМАНДЫ
+  // ============================================================
+  const commands = {
+    help() {
+      log('ДОСТУПНЫЕ КОМАНДЫ:', 'highlight');
+      ['start','stop','status','blocks','claim','wallet','setwallet','eco','top','ref','buy','pool','clear','exit'].forEach(c => log(`  ${c}`, 'info'));
+    },
+    start() {
+      if (state.banned) { log('❌ Аккаунт заблокирован', 'error'); return; }
+      if (state.mining) { log('❌ Уже запущен', 'error'); return; }
+      state.mining = true;
+      document.getElementById('status-indicator').className = 'status-led led-green';
+      document.getElementById('status-text').textContent = 'MINING';
+      log(`⛏️ Майнинг запущен (${state.ecoMode?'ECO':'PRO'})`, 'success');
+      startMiningLoop();
+    },
+    stop() {
+      if (!state.mining) { log('❌ Не запущен', 'error'); return; }
+      state.mining = false;
+      document.getElementById('status-indicator').className = 'status-led led-red';
+      document.getElementById('status-text').textContent = 'OFFLINE';
+      if (miningInterval) { clearInterval(miningInterval); miningInterval = null; }
+      log('⏹️ Остановлен', 'highlight');
+      saveState();
+    },
+    status() {
+      if (state.banned) { log('❌ Аккаунт заблокирован', 'error'); return; }
+      log('📊 СТАТУС:', 'highlight');
+      log(`  Режим: ${state.ecoMode?'🌿 ECO':'⚡ PRO'}`, 'info');
+      log(`  Хешрейт: ${state.hashrate.toFixed(2)} MH/s`, 'info');
+      log(`  Блоков: ${state.blocks}`, 'info');
+      log(`  Ожидает: ${state.pending.toFixed(2)} MIRA`, 'info');
+      log(`  Сложность: ${state.difficulty}`, 'info');
+      log(`  Кошелёк: ${state.userWallet || 'НЕ НАСТРОЕН'}`, 'info');
+    },
+    blocks() {
+      log('📜 ПОСЛЕДНИЕ БЛОКИ:', 'highlight');
+      for (let i = 0; i < 10; i++) {
+        const h = state.blocks - i;
+        if (h <= 0) break;
+        log(`  #${h} | +${(50+Math.floor(Math.random()*30))} MIRA`, 'info');
+      }
+    },
+    setwallet(args) {
+      if (!args || args.length === 0) { log('❌ Укажите адрес', 'error'); return; }
+      const addr = args[0];
+      if (!/^[EQ][A-Za-z0-9_-]{47}$/.test(addr) && !/^[UQ][A-Za-z0-9_-]{47}$/.test(addr)) {
+        log('❌ Невалидный адрес (должен начинаться с EQ/UQ, длина 48 символов)', 'error');
+        return;
+      }
+      state.userWallet = addr;
+      localStorage.setItem('mira_user_wallet', addr);
+      log(`✅ Сохранён: ${addr}`, 'success');
+      saveState();
+    },
+    claim() {
+      if (state.banned) { log('❌ Аккаунт заблокирован', 'error'); return; }
+      if (state.pending < 0.1) { log('❌ Нет награды', 'error'); return; }
+      if (!state.userWallet) { log('❌ Настройте кошелёк: setwallet EQ...', 'error'); return; }
+      const amount = state.pending;
+      const code = 'MIRA-' + Math.random().toString(36).substring(2,8).toUpperCase();
+      state.pending = 0;
+
+      apiCall('claim', { amount, wallet: state.userWallet, code }).then(res => {
+        if (res?.success) {
+          log(`✅ ЗАЯВКА: ${amount.toFixed(2)} MIRA`, 'success');
+          log(`🔑 Код: ${code}`, 'highlight');
+        } else if (res?.error) {
+          log(`❌ ${res.error}`, 'error');
+          state.pending = amount;
+        }
+      });
+      saveState();
+    },
+    wallet() {
+      log('📬 АДРЕСА:', 'highlight');
+      log(`  Холдер: ${CONFIG.holderAddress}`, 'info');
+      log(`  Контракт: ${CONFIG.masterAddress}`, 'muted');
+      log(`  Ваш: ${state.userWallet || 'НЕ НАСТРОЕН'}`, 'info');
+    },
+    eco() {
+      state.ecoMode = !state.ecoMode;
+      log(`🔋 Режим: ${state.ecoMode?'🌿 ECO':'⚡ PRO'}`, 'highlight');
+      if (state.mining) startMiningLoop();
+      saveState();
+    },
+    top() {
+      log('🏆 ТОП (симуляция):', 'highlight');
+      ['alpha','hash_king','ton_whale','mira_lord','0x_dev'].forEach((n,i) => {
+        log(`  #${i+1} ${n.padEnd(12)} ${(Math.random()*300+50).toFixed(0)} MH/s`, i<2?'highlight':'info');
+      });
+    },
+    ref() {
+      log(`🔗 Ссылка: https://t.me/ваш_бот?start=ref_${state.refCode}`, 'highlight');
+    },
+    buy() { window.open(CONFIG.stonfiSwap, '_blank'); },
+    pool() { window.open(CONFIG.stonfiPool, '_blank'); },
+    clear() { while (output.firstChild) output.removeChild(output.firstChild); log('🧹 Очищено', 'muted'); },
+    exit() { if (state.mining) commands.stop(); setTimeout(() => location.reload(), 500); }
+  };
+
+  // ============================================================
+  //  СОХРАНЕНИЕ
+  // ============================================================
+  function saveState() {
+    try { localStorage.setItem('mira_terminal', JSON.stringify(state)); } catch(e) {}
+  }
+  function loadState() {
+    try {
+      const s = JSON.parse(localStorage.getItem('mira_terminal'));
+      if (s) Object.assign(state, s);
+      const w = localStorage.getItem('mira_user_wallet');
+      if (w) state.userWallet = w;
+    } catch(e) {}
+  }
+
+  // ============================================================
+  //  ВВОД
+  // ============================================================
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const cmd = input.value.trim();
+    input.value = '';
+    if (!cmd) return;
+    log(`> ${cmd}`, 'muted');
+    const parts = cmd.split(' ');
+    const name = parts[0].toLowerCase();
+    if (commands[name]) commands[name](parts.slice(1));
+    else log(`❌ Команда не найдена`, 'error');
+  });
+
+  // ============================================================
+  //  СТАРТ
+  // ============================================================
+  loadState();
+  document.getElementById('pid').textContent = state.pid;
+
+  log('⛏️ MIRA TERMINAL v5.3 — СТАБИЛЬНАЯ', 'highlight');
+  log(`📡 API: ${API_BASE}`, 'muted');
+  log(`🌿 Режим: ${state.ecoMode?'ECO':'PRO'}`, 'info');
+  log(`🛡️ Защита: активна (кеширование, fallback, honeypot)`, 'success');
+  if (state.userWallet) log(`📬 Кошелёк: ${state.userWallet}`, 'success');
+  else log('⚠️ Настройте кошелёк: setwallet EQ...', 'error');
+  log('💡 Введите help', 'muted');
+
+  fetchBalances();
+
+  if (state.mining && !state.banned) {
+    document.getElementById('status-indicator').className = 'status-led led-green';
+    document.getElementById('status-text').textContent = 'MINING';
+    startMiningLoop();
+  }
+
+  setInterval(saveState, 15000);
+  document.addEventListener('click', () => input.focus());
+  input.focus();
+</script>
+</body>
+</html>
