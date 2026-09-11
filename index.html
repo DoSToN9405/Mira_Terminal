@@ -349,6 +349,8 @@ const state = {
 
   blocks: 0,
 
+  poolBlocks: 0,
+
   pending: 0,
 
   difficulty: 1,
@@ -587,6 +589,9 @@ async function loadPool() {
   state.difficulty =
     Number(data.difficulty || 1);
 
+  state.poolBlocks =
+    Number(data.blocks || 0);
+
 }
 
 
@@ -632,7 +637,12 @@ async function showStatus() {
   );
 
   log(
-    `Блоков: ${state.blocks}`,
+    `Sizning bloklaringiz: ${state.blocks}`,
+    "info"
+  );
+
+  log(
+    `Umumiy pool bloklari: ${state.poolBlocks}`,
     "info"
   );
 
@@ -757,6 +767,9 @@ async function mineRound() {
     // Raundda faqat bitta SHA-256 ishlatiladi.
     state.hashrate = 1 / 15 / 1000000;
 
+    // stop bosilgandan keyin serverga yangi submit yuborilmaydi.
+    if (!state.mining) return;
+
 
     const result =
       await api(
@@ -777,7 +790,10 @@ async function mineRound() {
     if (result?.success) {
 
       state.blocks =
-        result.block;
+        Number(result.userBlock || state.blocks);
+
+      state.poolBlocks =
+        Number(result.block || state.poolBlocks);
 
       state.pending =
         Number(
@@ -792,7 +808,7 @@ async function mineRound() {
 
 
       log(
-        `⛏️ БЛОК #${result.block} | +${result.reward} MIRA`,
+        `⛏️ UMUMIY BLOK #${result.block} | sizniki #${result.userBlock} | +${result.reward} MIRA`,
         "success"
       );
 
@@ -996,6 +1012,29 @@ async function showTop() {
 
 }
 
+async function showRecentBlocks() {
+
+  const data = await api("blocks/recent");
+
+  if (!data?.success) return;
+
+  log("🌐 OXIRGI UMUMIY BLOKLAR:", "highlight");
+
+  if (!data.blocks?.length) {
+    log("Hali bloklar yo‘q", "muted-text");
+    return;
+  }
+
+  data.blocks.forEach(block => {
+    const time = new Date(block.createdAt).toLocaleTimeString();
+    log(
+      `#${block.number} — ${block.miner} | +${block.reward} MIRA | ${time}`,
+      "info"
+    );
+  });
+
+}
+
 
 // ======================================================
 // WALLET
@@ -1122,6 +1161,8 @@ function help() {
 
     "top — топ майнеров",
 
+    "blocks — oxirgi umumiy bloklar",
+
     "wallet — показать кошелёк",
 
     "setwallet EQ... — сохранить кошелёк",
@@ -1172,6 +1213,8 @@ const commands = {
   },
 
   top: showTop,
+
+  blocks: showRecentBlocks,
 
   wallet: () => {
 
