@@ -351,6 +351,10 @@ const state = {
 
   poolBlocks: 0,
 
+  activeMiners: 0,
+
+  lastGlobalBlock: 0,
+
   pending: 0,
 
   difficulty: 1,
@@ -722,107 +726,28 @@ async function mineRound() {
   state.miningBusy = true;
 
   try {
+    const result = await api("pool/heartbeat");
 
-    const challenge =
-      await api("challenge");
-
-    if (
-      !challenge?.success ||
-      !challenge.salt
-    ) {
-
-      log(
-        challenge?.error ||
-        "Challenge error",
-        "error"
-      );
-
+    if (!result?.success) {
+      log(result?.error || "Pool connection error", "error");
       return;
-
     }
 
-    const salt =
-      challenge.salt;
+    state.poolBlocks = Number(result.height || 0);
+    state.activeMiners = Number(result.activeMiners || 0);
+    state.pending = Number(result.balance || state.pending);
+    state.blocks = Number(result.userBlocks || state.blocks);
 
-    const difficulty =
-      Number(
-        challenge.difficulty || 1
-      );
+    if (result.latestBlock && result.latestBlock.number > state.lastGlobalBlock) {
+      const block = result.latestBlock;
+      state.lastGlobalBlock = block.number;
+      const mine = String(block.minerId) === String(state.telegramId);
+      const reward = mine
+        ? block.finderReward + block.participantReward
+        : block.participantReward;
 
-    state.difficulty =
-      difficulty;
-
-    log(
-      "🌿 Mobil raund: 15 soniya kutish rejimi",
-      "muted-text"
-    );
-
-    const ready = await waitWhileMining(15000);
-
-    if (!ready) return;
-
-    const foundNonce = `${Date.now()}_${crypto.randomUUID()}`;
-    const hash = await sha256(salt + foundNonce);
-
-    // Raundda faqat bitta SHA-256 ishlatiladi.
-    state.hashrate = 1 / 15 / 1000000;
-
-    // stop bosilgandan keyin serverga yangi submit yuborilmaydi.
-    if (!state.mining) return;
-
-
-    const result =
-      await api(
-        "submit",
-        {
-
-          nonce:
-            foundNonce,
-
-          difficulty,
-
-          hash
-
-        }
-      );
-
-
-    if (result?.success) {
-
-      state.blocks =
-        Number(result.userBlock || state.blocks);
-
-      state.poolBlocks =
-        Number(result.block || state.poolBlocks);
-
-      state.pending =
-        Number(
-          result.balance || 0
-        );
-
-      state.difficulty =
-        Number(
-          result.difficulty ||
-          difficulty
-        );
-
-
-      log(
-        `⛏️ UMUMIY BLOK #${result.block} | sizniki #${result.userBlock} | +${result.reward} MIRA`,
-        "success"
-      );
-
-
-    } else {
-
-      log(
-        `❌ ${
-          result?.error ||
-          "Submit failed"
-        }`,
-        "error"
-      );
-
+      log(`🌐 BLOK #${block.number} | topuvchi: ${block.miner} | qatnashchilar: ${block.participants}`, "highlight");
+      log(mine ? `🏆 Siz topdingiz: +${reward} MIRA` : `🌿 Faol qatnashuv: +${reward} MIRA`, "success");
     }
 
 
@@ -891,7 +816,7 @@ function startMining() {
 
 
   log(
-    "⛏️ MOBILE режим запущен: 1 SHA / 15 сек",
+    "⛏️ Umumiy poolga qo‘shildingiz: blok har 30 soniyada",
     "success"
   );
 
@@ -902,7 +827,7 @@ function startMining() {
   miningTimer =
     setInterval(
       mineRound,
-      1000
+      10000
     );
 
 }
@@ -1028,7 +953,7 @@ async function showRecentBlocks() {
   data.blocks.forEach(block => {
     const time = new Date(block.createdAt).toLocaleTimeString();
     log(
-      `#${block.number} — ${block.miner} | +${block.reward} MIRA | ${time}`,
+      `#${block.number} — ${block.miner} | ${block.participants} mayner | topuvchi +${block.finderReward} | qatnashuvchi +${block.participantReward} MIRA | ${time}`,
       "info"
     );
   });
