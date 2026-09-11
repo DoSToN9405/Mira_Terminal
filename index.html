@@ -6,62 +6,59 @@
 <meta charset="UTF-8">
 
 <meta
-  name="viewport"
-  content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
->
+name="viewport"
+content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+/>
 
-<title>⛏️ MIRA TERMINAL v9.3</title>
+<title>⛏️ MIRA TERMINAL v10.0</title>
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
 
 * {
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
 }
 
 body {
 
-  background: #0a0c10;
+  background: #080b10;
+
   color: #00ff88;
 
-  font-family:
-    "Courier New",
-    monospace;
-
-  padding: 10px;
+  font-family: "Courier New", monospace;
 
   height: 100vh;
 
-  display: flex;
+  padding: 10px;
 
-  flex-direction: column;
+  overflow: hidden;
 }
+
 
 #terminal {
 
+  height: 100%;
+
   background: #0d1117;
 
-  border:
-    1px solid #00ff8833;
+  border: 1px solid #00ff8844;
 
-  border-radius: 12px;
+  border-radius: 18px;
 
   padding: 14px;
-
-  flex: 1;
 
   display: flex;
 
   flex-direction: column;
 
-  overflow: hidden;
-
   box-shadow:
-    0 0 40px #00ff8811;
+    0 0 30px #00ff8811,
+    inset 0 0 30px #00ff8805;
 }
+
 
 .header {
 
@@ -69,17 +66,62 @@ body {
 
   justify-content: space-between;
 
-  border-bottom:
-    1px solid #00ff8833;
-
-  padding-bottom: 8px;
-
-  margin-bottom: 8px;
+  gap: 10px;
 
   flex-wrap: wrap;
 
-  gap: 8px;
+  padding-bottom: 10px;
+
+  border-bottom:
+    1px solid #00ff8833;
 }
+
+
+.title {
+
+  color: #00e676;
+
+  font-size: 18px;
+
+  letter-spacing: 1px;
+}
+
+
+.status-led {
+
+  width: 12px;
+
+  height: 12px;
+
+  display: inline-block;
+
+  border-radius: 50%;
+
+  margin: 0 8px;
+}
+
+
+.led-red {
+
+  background: #ff5252;
+
+  box-shadow: 0 0 12px #ff5252;
+}
+
+
+.led-green {
+
+  background: #00e676;
+
+  box-shadow: 0 0 14px #00e676;
+}
+
+
+.muted {
+
+  color: #718096;
+}
+
 
 #output {
 
@@ -87,24 +129,62 @@ body {
 
   overflow-y: auto;
 
-  padding: 4px 0;
+  padding-top: 10px;
 
   font-size: 14px;
 
-  line-height: 1.5;
-
-  white-space: pre-wrap;
+  line-height: 1.6;
 
   word-break: break-word;
 }
 
-#output::-webkit-scrollbar {
-  width: 6px;
+
+.log-entry {
+
+  padding: 6px 0;
+
+  border-bottom:
+    1px solid #00ff8815;
 }
 
-#output::-webkit-scrollbar-thumb {
-  background: #00ff8844;
+
+.time {
+
+  color: #64748b;
+
+  margin-right: 8px;
 }
+
+
+.success {
+
+  color: #00e676;
+}
+
+
+.error {
+
+  color: #ff6b6b;
+}
+
+
+.info {
+
+  color: #8ab4f8;
+}
+
+
+.highlight {
+
+  color: #ffd166;
+}
+
+
+.muted-text {
+
+  color: #7c8799;
+}
+
 
 .prompt-line {
 
@@ -114,13 +194,14 @@ body {
 
   gap: 8px;
 
-  margin-top: 8px;
+  padding-top: 12px;
+
+  margin-top: 10px;
 
   border-top:
-    1px solid #00ff8811;
-
-  padding-top: 8px;
+    1px solid #00ff8833;
 }
+
 
 .prompt {
 
@@ -128,159 +209,124 @@ body {
 
   font-weight: bold;
 
+  font-size: 16px;
+
   white-space: nowrap;
 }
 
+
 #input {
+
+  flex: 1;
 
   background: transparent;
 
   border: none;
 
+  outline: none;
+
   color: #00ff88;
 
-  font-family:
-    "Courier New",
-    monospace;
+  font-family: "Courier New", monospace;
 
-  font-size: 14px;
+  font-size: 16px;
 
-  flex: 1;
-
-  outline: none;
+  min-width: 0;
 }
 
-.log-entry {
 
-  border-bottom:
-    1px solid #00ff8811;
+#input::placeholder {
 
-  padding: 5px 0;
-}
-
-.time {
-  color: #667788;
-  margin-right: 8px;
-}
-
-.highlight {
-  color: #ffd740;
-}
-
-.error {
-  color: #ff5252;
-}
-
-.success {
-  color: #00e676;
-}
-
-.info {
-  color: #64b5f6;
-}
-
-.muted {
-  color: #8090a0;
-}
-
-.status-led {
-
-  display: inline-block;
-
-  width: 10px;
-  height: 10px;
-
-  border-radius: 50%;
-
-  margin-right: 6px;
-}
-
-.led-green {
-
-  background: #00e676;
-
-  box-shadow:
-    0 0 12px #00e676;
-}
-
-.led-red {
-
-  background: #ff5252;
-
-  box-shadow:
-    0 0 12px #ff5252;
+  color: #42604f;
 }
 
 </style>
 
 </head>
 
+
 <body>
 
 <div id="terminal">
 
-  <div class="header">
 
-    <span>
+<div class="header">
 
-      ⛏️ MIRA TERMINAL v9.3 —
+<div>
 
-      <span
-        id="status-indicator"
-        class="status-led led-red"
-      ></span>
+<span class="title">
+⛏️ MIRA TERMINAL v10.0 —
+</span>
 
-      <span id="status-text">
-        OFFLINE
-      </span>
+<span
+id="status-indicator"
+class="status-led led-red">
+</span>
 
-    </span>
-
-    <span class="muted">
-
-      pid:
-      <span id="pid">-</span>
-
-      |
-
-      uptime:
-      <span id="uptime">0s</span>
-
-    </span>
-
-  </div>
-
-  <div id="output"></div>
-
-  <div class="prompt-line">
-
-    <span class="prompt">
-      mira@miner:~$
-    </span>
-
-    <input
-      type="text"
-      id="input"
-      autofocus
-      spellcheck="false"
-      autocomplete="off"
-    >
-
-  </div>
+<span id="status-text">
+OFFLINE
+</span>
 
 </div>
 
+
+<div class="muted">
+
+pid:
+<span id="pid">----</span>
+
+|
+
+uptime:
+<span id="uptime">0s</span>
+
+</div>
+
+</div>
+
+
+<div id="output"></div>
+
+
+<div class="prompt-line">
+
+<span class="prompt">
+mira@miner:~$
+</span>
+
+<input
+id="input"
+type="text"
+autocomplete="off"
+autocorrect="off"
+autocapitalize="off"
+spellcheck="false"
+placeholder="help"
+/>
+
+</div>
+
+
+</div>
+
+
 <script>
+
+// ============================================================
+// MIRA TERMINAL v10.0
+// ============================================================
+
+
+// ВСТАВЬ СВОЙ CLOUDFLARE WORKER URL
+const API_BASE =
+  "https://mira.networkk.workers.dev";
+
 
 // ============================================================
 // TELEGRAM
 // ============================================================
 
-const TG =
-  window.Telegram &&
-  window.Telegram.WebApp
-    ? window.Telegram.WebApp
-    : null;
+const TG = window.Telegram?.WebApp;
 
 
 if (TG) {
@@ -289,15 +335,12 @@ if (TG) {
 
   TG.expand();
 
+} else {
+
+  console.warn(
+    "Telegram WebApp API unavailable"
+  );
 }
-
-
-// ============================================================
-// CONFIG
-// ============================================================
-
-const API_BASE =
-  "https://mira.networkk.workers.dev";
 
 
 // ============================================================
@@ -308,43 +351,34 @@ const state = {
 
   mining: false,
 
+  miningBusy: false,
+
   hashrate: 0,
 
-  totalHashes: 0,
+  hashes: 0,
 
   blocks: 0,
 
-  pending: 0,
-
-  totalReward: 0,
+  balance: 0,
 
   difficulty: 1,
 
-  userWallet: null,
+  wallet: localStorage.getItem(
+    "mira_wallet"
+  ) || null,
 
   startTime: Date.now(),
 
-  pid:
-    Math.floor(
-      Math.random() * 9000 + 1000
-    ),
+  pid: Math.floor(
+    Math.random() * 9000 + 1000
+  ),
 
-  ecoMode:
-    /Mobi|Android|iPhone|iPad/i
-      .test(navigator.userAgent),
-
-  banned: false
-
+  interval: null
 };
 
 
-let miningInterval = null;
-
-let isMiningNow = false;
-
-
 // ============================================================
-// ELEMENTS
+// DOM
 // ============================================================
 
 const output =
@@ -353,81 +387,72 @@ const output =
 const input =
   document.getElementById("input");
 
+const pid =
+  document.getElementById("pid");
+
+const uptime =
+  document.getElementById("uptime");
+
 
 // ============================================================
 // LOG
 // ============================================================
 
-function log(msg, type = "info") {
+function log(message, type = "info") {
 
   const div =
     document.createElement("div");
 
-  div.className =
-    "log-entry";
+  div.className = "log-entry";
+
 
   const time =
     new Date()
       .toLocaleTimeString();
 
-  div.innerHTML =
-    '<span class="time">[' +
-    time +
-    ']</span>' +
-    '<span class="' +
-    type +
-    '">' +
-    escapeHtml(String(msg)) +
-    "</span>";
+
+  let className = "info";
+
+
+  if (type === "success")
+    className = "success";
+
+  if (type === "error")
+    className = "error";
+
+  if (type === "highlight")
+    className = "highlight";
+
+  if (type === "muted")
+    className = "muted-text";
+
+
+  div.innerHTML = `
+    <span class="time">
+      [${time}]
+    </span>
+
+    <span class="${className}">
+      ${escapeHtml(message)}
+    </span>
+  `;
+
 
   output.appendChild(div);
 
   output.scrollTop =
     output.scrollHeight;
-
-  if (
-    output.children.length > 300
-  ) {
-    output.removeChild(
-      output.firstChild
-    );
-  }
 }
 
 
 function escapeHtml(text) {
 
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
+  const div =
+    document.createElement("div");
 
+  div.textContent = text;
 
-// ============================================================
-// SHA256
-// ============================================================
-
-async function sha256(message) {
-
-  const encoder =
-    new TextEncoder();
-
-  const buffer =
-    await crypto.subtle.digest(
-      "SHA-256",
-      encoder.encode(message)
-    );
-
-  return Array.from(
-    new Uint8Array(buffer)
-  )
-    .map(
-      b =>
-        b.toString(16)
-          .padStart(2, "0")
-    )
-    .join("");
+  return div.innerHTML;
 }
 
 
@@ -440,26 +465,13 @@ async function apiCall(endpoint, data = {}) {
   try {
 
     const initData =
-      TG ? TG.initData : "";
+      TG?.initData || "";
 
-    if (!initData) {
-
-      log(
-        "🔒 Telegram initData отсутствует",
-        "error"
-      );
-
-      return {
-        success: false,
-        error: "Откройте приложение через Telegram"
-      };
-    }
 
     const response =
       await fetch(
-        API_BASE + "/" + endpoint,
+        API_BASE + endpoint,
         {
-
           method: "POST",
 
           headers: {
@@ -467,24 +479,34 @@ async function apiCall(endpoint, data = {}) {
               "application/json"
           },
 
-          body:
-            JSON.stringify({
+          body: JSON.stringify({
 
-              ...data,
+            ...data,
 
-              initData: initData
-
-            })
-
+            initData
+          })
         }
       );
 
-    const result =
+
+    const json =
       await response.json();
 
-    return result;
+
+    if (!response.ok) {
+
+      console.error(
+        "API error:",
+        json
+      );
+    }
+
+
+    return json;
 
   } catch (error) {
+
+    console.error(error);
 
     log(
       "⚠️ API error: " +
@@ -498,50 +520,105 @@ async function apiCall(endpoint, data = {}) {
 
 
 // ============================================================
-// LOAD BALANCE
+// SHA256
 // ============================================================
 
-async function fetchBalance() {
+async function sha256(text) {
+
+  const data =
+    new TextEncoder()
+      .encode(text);
+
+
+  const hash =
+    await crypto.subtle.digest(
+      "SHA-256",
+      data
+    );
+
+
+  return [...new Uint8Array(hash)]
+
+    .map(
+      b =>
+        b
+          .toString(16)
+          .padStart(2, "0")
+    )
+
+    .join("");
+}
+
+
+// ============================================================
+// STATUS
+// ============================================================
+
+async function getStatus() {
 
   const data =
     await apiCall(
-      "balance/me"
+      "/balance/me"
     );
 
-  if (!data) {
-    return;
-  }
 
-  if (data.success === false) {
+  if (!data) return;
+
+
+  if (!data.success) {
 
     log(
       "🔒 " +
-      (data.error || "Ошибка авторизации"),
+      (data.error || "Authorization failed"),
       "error"
     );
 
     return;
   }
 
-  state.pending =
-    Number(data.pending || 0);
+
+  state.balance =
+    Number(data.balance || 0);
 
   state.blocks =
     Number(data.blocks || 0);
 
-  state.totalReward =
-    Number(data.totalReward || 0);
+  state.wallet =
+    data.wallet ||
+    state.wallet;
 
-  if (data.wallet) {
-    state.userWallet =
-      data.wallet;
-  }
 
   log(
-    "⚖️ Мой баланс: " +
-    state.pending.toFixed(2) +
+    "📊 МОЙ СТАТУС",
+    "highlight"
+  );
+
+  log(
+    "👤 Telegram ID: " +
+    data.telegramId,
+    "info"
+  );
+
+  log(
+    "⛏️ Блоков: " +
+    state.blocks,
+    "info"
+  );
+
+  log(
+    "⚖️ Баланс: " +
+    state.balance.toFixed(2) +
     " MIRA",
     "highlight"
+  );
+
+  log(
+    "📬 Кошелёк: " +
+    (
+      state.wallet ||
+      "НЕ НАСТРОЕН"
+    ),
+    "info"
   );
 }
 
@@ -550,151 +627,120 @@ async function fetchBalance() {
 // POOL
 // ============================================================
 
-async function fetchPoolState() {
-
-  try {
-
-    const response =
-      await fetch(
-        API_BASE + "/pool",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-          body: "{}"
-        }
-      );
-
-    const data =
-      await response.json();
-
-    if (data.success) {
-
-      state.difficulty =
-        Number(
-          data.difficulty || 1
-        );
-
-      log(
-        "⛏️ ПУЛ: блок #" +
-        data.blocks +
-        " | сложность " +
-        data.difficulty,
-        "info"
-      );
-    }
-
-  } catch (error) {
-
-    log(
-      "⚠️ Pool error",
-      "error"
-    );
-  }
-}
-
-
-// ============================================================
-// TOP
-// ============================================================
-
-async function fetchTop() {
+async function getPool() {
 
   const data =
-    await apiCall("top");
+    await apiCall("/pool");
 
-  if (!data) {
-    return;
-  }
 
-  if (data.success === false) {
+  if (!data) return;
+
+
+  if (!data.success) {
 
     log(
-      "❌ " + data.error,
+      "⚠️ Pool error: " +
+      (data.error || "unknown"),
       "error"
     );
 
     return;
   }
 
-  log(
-    "🏆 ТОП МАЙНЕРОВ:",
-    "highlight"
-  );
 
-  if (
-    !data.top ||
-    !data.top.length
-  ) {
-
-    log(
-      "Пока нет майнеров",
-      "muted"
+  state.difficulty =
+    Number(
+      data.difficulty || 1
     );
 
-    return;
-  }
 
-  data.top.forEach(
-    function (item, index) {
-
-      let medal =
-        "#" + item.rank;
-
-      if (index === 0) {
-        medal = "🥇";
-      }
-
-      if (index === 1) {
-        medal = "🥈";
-      }
-
-      if (index === 2) {
-        medal = "🥉";
-      }
-
-      log(
-        medal +
-        " " +
-        String(item.id)
-          .substring(0, 10) +
-        "... — " +
-        item.blocks +
-        " блоков",
-        index < 3
-          ? "highlight"
-          : "info"
-      );
-
-    }
+  log(
+    `⛏️ ПУЛ: блок #${data.blocks} | сложность ${data.difficulty}`,
+    "info"
   );
 }
 
 
 // ============================================================
-// MINE BLOCK
+// WALLET
 // ============================================================
 
-async function mineBlock() {
+async function setWallet(address) {
+
+  const data =
+    await apiCall(
+      "/setwallet",
+      {
+        wallet: address
+      }
+    );
+
+
+  if (!data) return;
+
+
+  if (!data.success) {
+
+    log(
+      "❌ " +
+      data.error,
+      "error"
+    );
+
+    return;
+  }
+
+
+  state.wallet =
+    data.wallet;
+
+
+  localStorage.setItem(
+    "mira_wallet",
+    state.wallet
+  );
+
+
+  log(
+    "✅ Кошелёк сохранён",
+    "success"
+  );
+}
+
+
+// ============================================================
+// MINING
+// ============================================================
+
+async function mine() {
+
+  if (
+    state.miningBusy ||
+    !state.mining
+  ) return;
+
+
+  state.miningBusy = true;
+
 
   try {
 
     const challenge =
-      await apiCall("challenge");
+      await apiCall(
+        "/challenge"
+      );
+
 
     if (
       !challenge ||
-      !challenge.success ||
-      !challenge.salt
+      !challenge.success
     ) {
 
       log(
-        "⚠️ Challenge: " +
+        "⚠️ Challenge error: " +
         (
           challenge?.error ||
-          "failed"
+          "unknown"
         ),
         "error"
       );
@@ -702,40 +748,34 @@ async function mineBlock() {
       return;
     }
 
+
     const salt =
       challenge.salt;
 
+
     const difficulty =
       Number(
-        challenge.difficulty
+        challenge.difficulty || 1
       );
-
-    state.difficulty =
-      difficulty;
 
 
     const target =
-      difficulty * 100000;
-
-    const threshold =
-      Math.floor(
-        0xFFFFFFFF / target
-      );
+      "0".repeat(difficulty);
 
 
-    let hashes = 0;
+    let nonce;
 
-    let foundNonce = null;
+    let hash;
+
+    let found = false;
 
 
     const start =
       performance.now();
 
 
-    const maxIterations =
-      state.ecoMode
-        ? 500
-        : 3000;
+    // Максимум попыток за один раунд
+    const maxIterations = 30000;
 
 
     for (
@@ -744,36 +784,28 @@ async function mineBlock() {
       i++
     ) {
 
-      if (!state.mining) {
+      if (!state.mining)
         break;
-      }
 
-      const nonce =
-        salt +
-        "_" +
-        i +
-        "_" +
-        Date.now();
 
-      const hash =
+      nonce =
+        crypto.randomUUID();
+
+
+      hash =
         await sha256(
           salt + nonce
         );
 
-      hashes++;
 
-      state.totalHashes++;
+      state.hashes++;
 
-      const value =
-        parseInt(
-          hash.substring(0, 8),
-          16
-        );
 
-      if (value < threshold) {
+      if (
+        hash.startsWith(target)
+      ) {
 
-        foundNonce =
-          nonce;
+        found = true;
 
         break;
       }
@@ -782,20 +814,22 @@ async function mineBlock() {
 
     const elapsed =
       (
-        performance.now() -
-        start
+        performance.now() - start
       ) / 1000;
 
 
     if (elapsed > 0) {
 
       state.hashrate =
-        hashes / elapsed / 1000000;
-
+        (
+          maxIterations /
+          elapsed /
+          1000
+        );
     }
 
 
-    if (!foundNonce) {
+    if (!found) {
 
       log(
         "🔍 Nonce не найден",
@@ -806,83 +840,234 @@ async function mineBlock() {
     }
 
 
-    log(
-      "🎯 Найден nonce, отправляем...",
-      "highlight"
-    );
-
-
     const result =
       await apiCall(
-        "submit",
+        "/submit",
         {
-          nonce: foundNonce,
-          difficulty: difficulty
+          nonce
         }
       );
 
 
     if (
-      result &&
-      result.success
+      result?.success
     ) {
 
       state.blocks =
         result.block;
 
-      state.pending =
-        Number(
-          result.balance || 0
-        );
+      state.balance =
+        result.balance;
 
       state.difficulty =
-        Number(
-          result.difficulty ||
-          difficulty
-        );
+        result.difficulty;
+
 
       log(
-        "⛏️ БЛОК #" +
-        state.blocks +
-        " | +" +
-        result.reward +
-        " MIRA",
+        `🎉 БЛОК #${result.block} | +${result.reward} MIRA`,
         "success"
       );
 
-    } else if (result) {
 
-      if (
-        result.code ===
-        "DIFF_MISMATCH"
-      ) {
+      log(
+        `⚖️ Баланс: ${Number(result.balance).toFixed(2)} MIRA`,
+        "highlight"
+      );
 
-        state.difficulty =
-          result.expected;
+    } else {
 
-        log(
-          "↻ Сложность обновлена",
-          "muted"
-        );
-
-      } else {
-
-        log(
-          "❌ " +
-          (
-            result.error ||
-            "Submit error"
-          ),
-          "error"
-        );
-      }
+      log(
+        "❌ " +
+        (
+          result?.error ||
+          "Submit failed"
+        ),
+        "error"
+      );
     }
 
   } catch (error) {
 
     log(
-      "⚠️ Mine error: " +
+      "⚠️ Mining error: " +
       error.message,
+      "error"
+    );
+
+  } finally {
+
+    state.miningBusy = false;
+  }
+}
+
+
+// ============================================================
+// START / STOP
+// ============================================================
+
+function startMining() {
+
+  if (state.mining) {
+
+    log(
+      "⚠️ Уже запущен",
+      "error"
+    );
+
+    return;
+  }
+
+
+  state.mining = true;
+
+
+  document
+    .getElementById(
+      "status-indicator"
+    )
+    .className =
+      "status-led led-green";
+
+
+  document
+    .getElementById(
+      "status-text"
+    )
+    .textContent =
+      "MINING";
+
+
+  log(
+    "⛏️ Майнинг запущен",
+    "success"
+  );
+
+
+  mine();
+
+
+  state.interval =
+    setInterval(
+      mine,
+      3000
+    );
+}
+
+
+function stopMining() {
+
+  state.mining = false;
+
+
+  if (state.interval) {
+
+    clearInterval(
+      state.interval
+    );
+
+    state.interval = null;
+  }
+
+
+  document
+    .getElementById(
+      "status-indicator"
+    )
+    .className =
+      "status-led led-red";
+
+
+  document
+    .getElementById(
+      "status-text"
+    )
+    .textContent =
+      "OFFLINE";
+
+
+  log(
+    "⏹️ Майнинг остановлен",
+    "highlight"
+  );
+}
+
+
+// ============================================================
+// CLAIM
+// ============================================================
+
+async function claim() {
+
+  if (!state.wallet) {
+
+    log(
+      "❌ Сначала: setwallet EQ...",
+      "error"
+    );
+
+    return;
+  }
+
+
+  const data =
+    await apiCall(
+      "/balance/me"
+    );
+
+
+  if (
+    !data?.success
+  ) return;
+
+
+  const amount =
+    Number(data.balance || 0);
+
+
+  const result =
+    await apiCall(
+      "/claim",
+      {
+        amount
+      }
+    );
+
+
+  if (
+    result?.success
+  ) {
+
+    state.balance = 0;
+
+
+    log(
+      "✅ Заявка создана",
+      "success"
+    );
+
+
+    log(
+      "🔑 Код: " +
+      result.code,
+      "highlight"
+    );
+
+
+    log(
+      "⚖️ Amount: " +
+      result.amount +
+      " MIRA",
+      "info"
+    );
+
+  } else {
+
+    log(
+      "❌ " +
+      (
+        result?.error ||
+        "Claim failed"
+      ),
       "error"
     );
   }
@@ -890,51 +1075,64 @@ async function mineBlock() {
 
 
 // ============================================================
-// MINING LOOP
+// TOP
 // ============================================================
 
-function startMiningLoop() {
+async function getTop() {
 
-  if (miningInterval) {
+  const data =
+    await apiCall("/top");
 
-    clearInterval(
-      miningInterval
+
+  if (
+    !data?.success
+  ) {
+
+    log(
+      "❌ Top error",
+      "error"
     );
+
+    return;
   }
 
 
-  const interval =
-    state.ecoMode
-      ? 4000
-      : 2000;
+  log(
+    "🏆 ТОП МАЙНЕРОВ:",
+    "highlight"
+  );
 
 
-  miningInterval =
-    setInterval(
-      async function () {
+  if (!data.top.length) {
 
-        if (
-          !state.mining ||
-          isMiningNow
-        ) {
-          return;
-        }
-
-        isMiningNow = true;
-
-        try {
-
-          await mineBlock();
-
-        } finally {
-
-          isMiningNow = false;
-
-        }
-
-      },
-      interval
+    log(
+      "Пока нет майнеров",
+      "muted"
     );
+
+    return;
+  }
+
+
+  data.top.forEach(
+    (miner, index) => {
+
+      const medal =
+        index === 0
+          ? "🥇"
+          : index === 1
+          ? "🥈"
+          : index === 2
+          ? "🥉"
+          : "#" + miner.rank;
+
+
+      log(
+        `${medal} ${miner.username} — ${miner.blocks} блоков`,
+        "info"
+      );
+    }
+  );
 }
 
 
@@ -947,329 +1145,93 @@ const commands = {
   help() {
 
     log(
-      "КОМАНДЫ:",
+      "📖 КОМАНДЫ:",
       "highlight"
     );
 
+
     [
-      "start",
-      "stop",
-      "status",
-      "claim",
-      "wallet",
-      "setwallet",
-      "eco",
-      "pool",
-      "top",
-      "clear",
-      "exit"
+      "start — начать",
+      "stop — остановить",
+      "status — мой статус",
+      "pool — состояние пула",
+      "top — топ майнеров",
+      "wallet — показать кошелёк",
+      "setwallet EQ... — установить TON кошелёк",
+      "claim — создать заявку",
+      "clear — очистить",
+      "help — помощь"
     ]
-      .forEach(
-        command =>
-          log(
-            "  " + command,
-            "info"
-          )
-      );
+
+    .forEach(
+      command =>
+        log(
+          command,
+          "info"
+        )
+    );
   },
 
 
   start() {
-
-    if (state.mining) {
-
-      log(
-        "❌ Уже запущен",
-        "error"
-      );
-
-      return;
-    }
-
-    state.mining = true;
-
-    document
-      .getElementById(
-        "status-indicator"
-      )
-      .className =
-        "status-led led-green";
-
-    document
-      .getElementById(
-        "status-text"
-      )
-      .textContent =
-        "MINING";
-
-    log(
-      "⛏️ Майнинг запущен (" +
-      (
-        state.ecoMode
-          ? "ECO"
-          : "PRO"
-      ) +
-      ")",
-      "success"
-    );
-
-    startMiningLoop();
+    startMining();
   },
 
 
   stop() {
-
-    state.mining = false;
-
-    document
-      .getElementById(
-        "status-indicator"
-      )
-      .className =
-        "status-led led-red";
-
-    document
-      .getElementById(
-        "status-text"
-      )
-      .textContent =
-        "OFFLINE";
-
-    if (miningInterval) {
-
-      clearInterval(
-        miningInterval
-      );
-
-      miningInterval = null;
-    }
-
-    log(
-      "⏹️ Майнинг остановлен",
-      "highlight"
-    );
+    stopMining();
   },
 
 
-  async status() {
-
-    await fetchBalance();
-
-    log(
-      "📊 СТАТУС:",
-      "highlight"
-    );
-
-    log(
-      "🌿 Режим: " +
-      (
-        state.ecoMode
-          ? "ECO"
-          : "PRO"
-      ),
-      "info"
-    );
-
-    log(
-      "⚡ Хешрейт: " +
-      state.hashrate.toFixed(2) +
-      " MH/s",
-      "info"
-    );
-
-    log(
-      "⚖️ Баланс: " +
-      state.pending.toFixed(2) +
-      " MIRA",
-      "highlight"
-    );
-
-    log(
-      "⛏️ Блоков: " +
-      state.blocks,
-      "info"
-    );
-
-    log(
-      "📬 Кошелёк: " +
-      (
-        state.userWallet ||
-        "НЕ НАСТРОЕН"
-      ),
-      "info"
-    );
+  status() {
+    getStatus();
   },
 
 
-  setwallet(args) {
-
-    if (
-      !args ||
-      !args[0]
-    ) {
-
-      log(
-        "Использование: setwallet EQ...",
-        "error"
-      );
-
-      return;
-    }
+  pool() {
+    getPool();
+  },
 
 
-    const address =
-      args[0].trim();
-
-
-    if (
-      !/^(EQ|UQ)[A-Za-z0-9_-]{46}$/
-        .test(address)
-    ) {
-
-      log(
-        "❌ Неверный TON адрес",
-        "error"
-      );
-
-      return;
-    }
-
-
-    state.userWallet =
-      address;
-
-    localStorage.setItem(
-      "mira_wallet",
-      address
-    );
-
-    log(
-      "✅ Кошелёк сохранён",
-      "success"
-    );
+  top() {
+    getTop();
   },
 
 
   wallet() {
 
     log(
-      "📬 Ваш кошелёк:",
-      "highlight"
-    );
-
-    log(
-      state.userWallet ||
-      "НЕ НАСТРОЕН",
-      "info"
-    );
-  },
-
-
-  async claim() {
-
-    if (!state.userWallet) {
-
-      log(
-        "❌ Сначала setwallet EQ...",
-        "error"
-      );
-
-      return;
-    }
-
-
-    await fetchBalance();
-
-
-    if (
-      state.pending < 0.1
-    ) {
-
-      log(
-        "❌ Недостаточно MIRA",
-        "error"
-      );
-
-      return;
-    }
-
-
-    const result =
-      await apiCall(
-        "claim",
-        {
-          amount:
-            state.pending,
-
-          wallet:
-            state.userWallet
-        }
-      );
-
-
-    if (
-      result &&
-      result.success
-    ) {
-
-      state.pending =
-        Number(
-          result.balance || 0
-        );
-
-      log(
-        "✅ Заявка создана",
-        "success"
-      );
-
-      log(
-        "🔑 ID: " +
-        result.code,
-        "highlight"
-      );
-
-    } else {
-
-      log(
-        "❌ " +
-        (
-          result?.error ||
-          "Claim error"
-        ),
-        "error"
-      );
-    }
-  },
-
-
-  eco() {
-
-    state.ecoMode =
-      !state.ecoMode;
-
-    log(
-      "🔋 Режим: " +
+      "📬 " +
       (
-        state.ecoMode
-          ? "🌿 ECO"
-          : "⚡ PRO"
+        state.wallet ||
+        "НЕ НАСТРОЕН"
       ),
       "highlight"
     );
+  },
 
-    if (state.mining) {
-      startMiningLoop();
+
+  setwallet(args) {
+
+    if (!args[0]) {
+
+      log(
+        "❌ Использование: setwallet EQ...",
+        "error"
+      );
+
+      return;
     }
+
+
+    setWallet(
+      args[0]
+    );
   },
 
 
-  pool() {
-    fetchPoolState();
-  },
-
-
-  top() {
-    fetchTop();
+  claim() {
+    claim();
   },
 
 
@@ -1278,21 +1240,10 @@ const commands = {
     output.innerHTML = "";
 
     log(
-      "🧹 Очищено",
+      "🧹 Терминал очищен",
       "muted"
     );
-  },
-
-
-  exit() {
-
-    if (state.mining) {
-      commands.stop();
-    }
-
-    location.reload();
   }
-
 };
 
 
@@ -1302,38 +1253,46 @@ const commands = {
 
 input.addEventListener(
   "keydown",
-  function (event) {
+  event => {
 
-    if (event.key !== "Enter") {
-      return;
-    }
+    if (
+      event.key !== "Enter"
+    ) return;
 
-    const command =
+
+    const text =
       input.value.trim();
+
 
     input.value = "";
 
-    if (!command) {
-      return;
-    }
+
+    if (!text) return;
+
 
     log(
-      "> " + command,
+      "> " + text,
       "muted"
     );
 
-    const parts =
-      command.split(/\s+/);
 
-    const name =
+    const parts =
+      text.split(/\s+/);
+
+
+    const command =
       parts[0].toLowerCase();
+
 
     const args =
       parts.slice(1);
 
-    if (commands[name]) {
 
-      commands[name](args);
+    if (
+      commands[command]
+    ) {
+
+      commands[command](args);
 
     } else {
 
@@ -1347,30 +1306,18 @@ input.addEventListener(
 
 
 // ============================================================
-// INIT
+// STARTUP
 // ============================================================
 
-document
-  .getElementById("pid")
-  .textContent =
-    state.pid;
-
-
-const savedWallet =
-  localStorage.getItem(
-    "mira_wallet"
-  );
-
-if (savedWallet) {
-  state.userWallet =
-    savedWallet;
-}
+pid.textContent =
+  state.pid;
 
 
 log(
-  "⛏️ MIRA TERMINAL v9.3",
+  "⛏️ MIRA TERMINAL v10.0",
   "highlight"
 );
+
 
 log(
   "📡 API: " + API_BASE,
@@ -1378,36 +1325,19 @@ log(
 );
 
 
-if (!TG) {
+if (TG?.initData) {
 
   log(
-    "❌ Telegram WebApp API не найден",
-    "error"
+    "🔐 Telegram WebApp авторизация активна",
+    "success"
   );
 
-} else if (!TG.initData) {
-
-  log(
-    "❌ Telegram initData пустой",
-    "error"
-  );
-
-  log(
-    "🔒 Откройте Mini App через Telegram Bot",
-    "error"
-  );
-
-} else {
 
   const user =
     TG.initDataUnsafe?.user;
 
-  log(
-    "🔓 Telegram WebApp авторизация активна",
-    "success"
-  );
 
-  if (user) {
+  if (user?.id) {
 
     log(
       "👤 Telegram ID: " +
@@ -1415,6 +1345,13 @@ if (!TG) {
       "info"
     );
   }
+
+} else {
+
+  log(
+    "⚠️ Откройте приложение через Telegram Bot",
+    "error"
+  );
 }
 
 
@@ -1424,45 +1361,49 @@ log(
 );
 
 
-// Загрузка данных
+// ============================================================
+// INITIAL API REQUESTS
+// ============================================================
 
-fetchBalance();
+getStatus();
 
-fetchPoolState();
+getPool();
 
 
-// Uptime
+// ============================================================
+// UPTIME
+// ============================================================
 
 setInterval(
-  function () {
+  () => {
 
-    document
-      .getElementById("uptime")
-      .textContent =
-        Math.floor(
-          (
-            Date.now() -
-            state.startTime
-          ) / 1000
-        ) + "s";
+    const seconds =
+      Math.floor(
+        (
+          Date.now() -
+          state.startTime
+        ) / 1000
+      );
+
+
+    uptime.textContent =
+      seconds + "s";
 
   },
   1000
 );
 
 
-// Focus
-
 document.addEventListener(
   "click",
-  function () {
-    input.focus();
-  }
+  () => input.focus()
 );
+
 
 input.focus();
 
 </script>
 
 </body>
+
 </html>
