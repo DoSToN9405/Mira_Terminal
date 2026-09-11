@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>⛏️ MIRA TERMINAL v9.0</title>
+  <title>⛏️ MIRA TERMINAL v9.1</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -32,7 +32,7 @@
 <body>
 <div id="terminal">
   <div style="display:flex;justify-content:space-between;border-bottom:1px solid #00ff8833;padding-bottom:6px;margin-bottom:6px;flex-wrap:wrap;">
-    <span>⛏️ MIRA TERMINAL v9.0 — <span id="status-indicator" class="status-led led-red"></span><span id="status-text">OFFLINE</span></span>
+    <span>⛏️ MIRA TERMINAL v9.1 — <span id="status-indicator" class="status-led led-red"></span><span id="status-text">OFFLINE</span></span>
     <span class="muted">pid: <span id="pid">-</span> | uptime: <span id="uptime">0s</span></span>
   </div>
   <div id="output"></div>
@@ -67,11 +67,11 @@
     startTime: Date.now(),
     pid: Math.floor(Math.random() * 9000 + 1000),
     ecoMode: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent),
-    banned: false,
-    salt: null
+    banned: false
   };
 
   let miningInterval = null;
+  let isMiningNow = false;
   const output = document.getElementById('output');
   const input = document.getElementById('input');
 
@@ -92,9 +92,6 @@
     return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
-  // ============================================================
-  //  API — initData обязательно, isTest больше нет
-  // ============================================================
   async function apiCall(endpoint, data = {}) {
     try {
       const res = await fetch(`${API_BASE}/${endpoint}`, {
@@ -107,7 +104,7 @@
       });
       return await res.json();
     } catch (e) {
-      log(`⚠️ Ошибка API: ${e.message}`, 'error');
+      log(`⚠️ API error: ${e.message}`, 'error');
       return null;
     }
   }
@@ -118,7 +115,6 @@
       log(`💰 TON: ${data.ton || '0'}`, 'info');
       log(`🪙 MIRA: ${data.mira || '0'}`, 'highlight');
     }
-    // Свой server-side баланс
     const mine = await apiCall('balance/me', {});
     if (mine) {
       state.pending = mine.pending || 0;
@@ -146,60 +142,93 @@
     }
   }
 
-  // ============================================================
-  //  МАЙНИНГ — новый flow challenge → solve → submit
-  // ============================================================
   async function mineBlock() {
-    // 1. Запрашиваем salt у сервера
-    const ch = await apiCall('challenge', {});
-    if (!ch || !ch.salt) {
-      log('⚠️ Не получен challenge', 'error');
-      return;
-    }
-    const { salt, difficulty } = ch;
-    state.difficulty = difficulty;
-    const target = difficulty * 100000;
-    const threshold = Math.floor(0xFFFFFFFF / target);
-
-    // 2. Ищем nonce локально
-    let hashes = 0;
-    const start = performance.now();
-    for (let i = 0; i < (state.ecoMode ? 5000 : 50000); i++) {
-      const nonce = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36);
-      const hex = await sha256(salt + nonce);
-      hashes++;
-      state.totalHashes++;
-      const hashValue = parseInt(hex.substring(0, 8), 16);
-      if (hashValue < threshold) {
-        // 3. Отправляем серверу
-        const res = await apiCall('submit', { nonce, difficulty });
-        if (res?.success) {
-          state.blocks = res.block;
-          const reward = res.reward || 50;
-          state.pending = res.balance || (state.pending + reward);
-          state.difficulty = res.difficulty || difficulty;
-          log(`⛏️ БЛОК #${state.blocks} | +${reward} MIRA | Слож. ${state.difficulty}`, 'success');
-        } else if (res?.error) {
-          log(`❌ Submit error: ${res.error}`, 'error');
+    try {
+      const ch = await apiCall('challenge', {});
+      if (!ch || !ch.salt) {
+        if (ch?.error?.includes('Too many')) {
+          log('⏳ Rate limit, пауза 10s', 'muted');
+          await new Promise(r => setTimeout(r, 10000));
+        } else {
+          log(`⚠️ Challenge: ${ch?.error || 'failed'}`, 'error');
+          await new Promise(r => setTimeout(r, 3000));
         }
-        break;
+        return;
       }
-    }
 
-    const elapsed = (performance.now() - start) / 1000;
-    state.hashrate = state.hashrate * 0.6 + (hashes / elapsed / 1000000) * 0.4;
-    state.power = Math.floor(state.hashrate * 1.2 + (state.ecoMode ? 10 : 30));
-    document.getElementById('uptime').textContent = Math.floor((Date.now() - state.startTime) / 1000) + 's';
-    saveState();
+      const { salt, difficulty } = ch;
+      state.difficulty = difficulty;
+      const target = difficulty * 100000;
+      const threshold = Math.floor(0xFFFFFFFF / target);
+
+      let hashes = 0;
+      const start = performance.now();
+      const maxIter = state.ecoMode ? 5000 : 50000;
+      let foundNonce = null;
+
+      for (let i = 0; i < maxIter; i++) {
+        const nonce = `${salt}_${i}_${Date.now()}`;
+        const hex = await sha256(salt + nonce);
+        hashes++;
+        state.totalHashes++;
+        const hashValue = parseInt(hex.substring(0, 8), 16);
+        if (hashValue < threshold) {
+          foundNonce = nonce;
+          break;
+        }
+      }
+
+      const elapsed = (performance.now() - start) / 1000;
+      state.hashrate = state.hashrate * 0.6 + (hashes / elapsed / 1000000) * 0.4;
+      state.power = Math.floor(state.hashrate * 1.2 + (state.ecoMode ? 10 : 30));
+
+      if (!foundNonce) {
+        log('🔍 Nonce не найден в этом раунде', 'muted');
+        saveState();
+        return;
+      }
+
+      const res = await apiCall('submit', { nonce: foundNonce, difficulty: difficulty });
+      if (res?.success) {
+        state.blocks = res.block;
+        state.pending = res.balance || (state.pending + (res.reward || 0));
+        state.difficulty = res.difficulty || difficulty;
+        log(`⛏️ БЛОК #${state.blocks} | +${res.reward} MIRA | Слож. ${state.difficulty}`, 'success');
+      } else if (res) {
+        const code = res.code || '';
+        if (code === 'DIFF_MISMATCH') {
+          log(`↻ Сложность устарела, обновляем (${res.expected})`, 'muted');
+          state.difficulty = res.expected;
+        } else if (code === 'TOO_FAST') {
+          log(`⏳ ${res.error}`, 'muted');
+          await new Promise(r => setTimeout(r, 5000));
+        } else if (code === 'NO_CHALLENGE') {
+          log('↻ Challenge истёк, повторяем', 'muted');
+        } else if (code === 'RATE_LIMIT') {
+          log('⏳ Rate limit, пауза 10s', 'muted');
+          await new Promise(r => setTimeout(r, 10000));
+        } else {
+          log(`❌ ${res.error}`, 'error');
+        }
+      }
+
+      document.getElementById('uptime').textContent = Math.floor((Date.now() - state.startTime) / 1000) + 's';
+      saveState();
+    } catch (e) {
+      log(`⚠️ Mine error: ${e.message}`, 'error');
+      await new Promise(r => setTimeout(r, 3000));
+    }
   }
 
   function startMiningLoop() {
     if (state.banned) { log('❌ Аккаунт заблокирован', 'error'); return; }
     if (miningInterval) clearInterval(miningInterval);
-    const interval = state.ecoMode ? 3000 : 800;
+    const interval = state.ecoMode ? 5000 : 1500;
     miningInterval = setInterval(async () => {
       if (!state.mining || state.banned) return;
-      await mineBlock();
+      if (isMiningNow) return;
+      isMiningNow = true;
+      try { await mineBlock(); } finally { isMiningNow = false; }
     }, interval);
   }
 
@@ -233,7 +262,7 @@
       log('📊 СТАТУС:', 'highlight');
       log(`  Режим: ${state.ecoMode?'🌿 ECO':'⚡ PRO'}`, 'info');
       log(`  Хешрейт: ${state.hashrate.toFixed(2)} MH/s`, 'info');
-      log(`  Ожидает: ${state.pending.toFixed(2)} MIRA (server-side)`, 'highlight');
+      log(`  Ожидает: ${state.pending.toFixed(2)} MIRA (server)`, 'highlight');
       log(`  Сложность: ${state.difficulty}`, 'info');
       log(`  Кошелёк: ${state.userWallet || 'НЕ НАСТРОЕН'}`, 'info');
     },
@@ -311,7 +340,7 @@
   loadState();
   document.getElementById('pid').textContent = state.pid;
 
-  log('⛏️ MIRA TERMINAL v9.0 — SECURITY PATCHED', 'highlight');
+  log('⛏️ MIRA TERMINAL v9.1 — SECURITY PATCHED', 'highlight');
   log(`📡 API: ${API_BASE}`, 'muted');
   log(`🌿 Режим: ${state.ecoMode?'ECO':'PRO'}`, 'info');
   log(`🛡️ HMAC initData + server-side balance + PoW challenge`, 'success');
