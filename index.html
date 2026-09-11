@@ -606,11 +606,7 @@ async function showStatus() {
   );
 
   log(
-    `Режим: ${
-      state.ecoMode
-        ? "🌿 ECO"
-        : "⚡ PRO"
-    }`,
+    "Режим: 🌿 MOBILE — 1 SHA / 15 сек",
     "info"
   );
 
@@ -683,6 +679,22 @@ async function sha256(
 
 }
 
+async function waitWhileMining(milliseconds) {
+
+  const endsAt = Date.now() + milliseconds;
+
+  while (state.mining && Date.now() < endsAt) {
+
+    await new Promise(
+      resolve => setTimeout(resolve, Math.min(250, endsAt - Date.now()))
+    );
+
+  }
+
+  return state.mining;
+
+}
+
 
 // ======================================================
 // MINE
@@ -730,103 +742,20 @@ async function mineRound() {
     state.difficulty =
       difficulty;
 
-    const target =
-      Math.floor(
-        0xFFFFFFFF /
-        (
-          difficulty *
-          100000
-        )
-      );
+    log(
+      "🌿 Mobil raund: 15 soniya kutish rejimi",
+      "muted-text"
+    );
 
-    const maxIterations =
-      state.ecoMode
-        ? 3000
-        : 15000;
+    const ready = await waitWhileMining(15000);
 
-    let foundNonce = null;
+    if (!ready) return;
 
-    let hashes = 0;
+    const foundNonce = `${Date.now()}_${crypto.randomUUID()}`;
+    const hash = await sha256(salt + foundNonce);
 
-    const started =
-      performance.now();
-
-
-    for (
-      let i = 0;
-      i < maxIterations;
-      i++
-    ) {
-
-      if (!state.mining) break;
-
-      const nonce =
-        `${i}_${Date.now()}_${Math.random()}`;
-
-      const hash =
-        await sha256(
-          salt + nonce
-        );
-
-      hashes++;
-
-      const value =
-        parseInt(
-          hash.substring(0, 8),
-          16
-        );
-
-      if (value < target) {
-
-        foundNonce =
-          nonce;
-
-        break;
-
-      }
-
-      // Не блокируем UI
-      if (i % 300 === 0) {
-
-        await new Promise(
-          resolve =>
-            setTimeout(resolve, 0)
-        );
-
-      }
-
-    }
-
-
-    const elapsed =
-      Math.max(
-        (
-          performance.now() -
-          started
-        ) / 1000,
-        0.001
-      );
-
-
-    const currentRate =
-      hashes / elapsed / 1000000;
-
-
-    state.hashrate =
-      state.hashrate * 0.7 +
-      currentRate * 0.3;
-
-
-    if (!foundNonce) {
-
-      log(
-        "🔍 Nonce не найден, новый раунд...",
-        "muted-text"
-      );
-
-      return;
-
-    }
+    // Raundda faqat bitta SHA-256 ishlatiladi.
+    state.hashrate = 1 / 15 / 1000000;
 
 
     const result =
@@ -837,7 +766,9 @@ async function mineRound() {
           nonce:
             foundNonce,
 
-          difficulty
+          difficulty,
+
+          hash
 
         }
       );
@@ -944,11 +875,7 @@ function startMining() {
 
 
   log(
-    `⛏️ Майнинг запущен (${
-      state.ecoMode
-        ? "ECO"
-        : "PRO"
-    })`,
+    "⛏️ MOBILE режим запущен: 1 SHA / 15 сек",
     "success"
   );
 
@@ -956,16 +883,10 @@ function startMining() {
   mineRound();
 
 
-  const delay =
-    state.ecoMode
-      ? 4000
-      : 1500;
-
-
   miningTimer =
     setInterval(
       mineRound,
-      delay
+      1000
     );
 
 }
@@ -1207,8 +1128,6 @@ function help() {
 
     "claim — создать заявку",
 
-    "eco — ECO/PRO режим",
-
     "clear — очистить",
 
     "help — помощь"
@@ -1272,27 +1191,10 @@ const commands = {
 
   eco: () => {
 
-    state.ecoMode =
-      !state.ecoMode;
-
-
     log(
-      `🔋 Режим: ${
-        state.ecoMode
-          ? "🌿 ECO"
-          : "⚡ PRO"
-      }`,
+      "🌿 MOBILE rejim doim yoqilgan: 1 SHA / 15 soniya",
       "highlight"
     );
-
-
-    if (state.mining) {
-
-      stopMining();
-
-      startMining();
-
-    }
 
   },
 
