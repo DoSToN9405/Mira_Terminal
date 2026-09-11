@@ -357,6 +357,8 @@ const state = {
 
   telegramId: null,
 
+  authorized: false,
+
   startTime: Date.now(),
 
   pid: Math.floor(
@@ -399,15 +401,17 @@ function log(
     new Date()
       .toLocaleTimeString();
 
-  const safeMessage =
-    String(message)
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+  const timeNode = document.createElement("span");
+  timeNode.className = "time";
+  timeNode.textContent = `[${time}]`;
 
-  row.innerHTML = `
-<span class="time">[${time}]</span>
-<span class="${type}">${safeMessage}</span>
-`;
+  const messageNode = document.createElement("span");
+  messageNode.className = ["success", "error", "info", "highlight", "muted-text"].includes(type)
+    ? type
+    : "info";
+  messageNode.textContent = String(message);
+
+  row.append(timeNode, messageNode);
 
   output.appendChild(row);
 
@@ -453,8 +457,10 @@ async function api(
         }
       );
 
-    const result =
-      await response.json();
+    const contentType = response.headers.get("content-type") || "";
+    const result = contentType.includes("application/json")
+      ? await response.json()
+      : { success: false, error: "Сервер вернул некорректный ответ" };
 
     if (!response.ok) {
 
@@ -526,6 +532,8 @@ async function authenticate() {
 
   state.telegramId =
     result.user?.id;
+
+  state.authorized = true;
 
   log(
     "🔐 Telegram WebApp авторизация активна",
@@ -894,6 +902,17 @@ async function mineRound() {
 
 function startMining() {
 
+  if (!state.authorized) {
+
+    log(
+      "Сначала пройдите авторизацию через Telegram",
+      "error"
+    );
+
+    return;
+
+  }
+
   if (state.mining) {
 
     log(
@@ -957,6 +976,8 @@ function startMining() {
 // ======================================================
 
 function stopMining() {
+
+  if (!state.mining) return;
 
   state.mining = false;
 
